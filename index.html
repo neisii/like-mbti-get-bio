@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MBTI 스타일 심리테스트 + GitHub Bio 생성기</title>
-  <meta name="description" content="10문항으로 ENTP/INTJ 등 MBTI 스타일 해석과 GitHub Bio 한 줄 문구를 자동 생성합니다." />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: system-ui, sans-serif; }
@@ -15,10 +14,16 @@
 <body class="min-h-screen bg-gray-50 text-gray-900">
   <main class="max-w-3xl mx-auto p-6">
     <section id="intro" class="card bg-white rounded-2xl p-6">
+      <h1 class="text-2xl font-bold mb-2">MBTI 스타일 심리테스트 + GitHub Bio 생성기</h1>
+      <p class="text-sm text-gray-600 mb-4">10문항에 답하면 MBTI 스타일을 추정하고, 결과에 맞는 깃허브 Bio 문구를 10개 추천해줘.</p>
       <button id="startBtn" class="px-5 py-3 rounded-xl bg-indigo-600 text-white">시작하기</button>
     </section>
 
     <section id="quiz" class="hidden mt-6 card bg-white rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div id="progressLabel" class="text-sm text-gray-600">1 / 10</div>
+        <div class="w-40 h-2 bg-gray-100 rounded-full overflow-hidden"><div id="progressBar" class="h-full bg-indigo-600" style="width:10%"></div></div>
+      </div>
       <h2 id="qText" class="text-xl font-bold mb-4">질문</h2>
       <div class="grid gap-3">
         <button id="opt1" class="px-5 py-4 rounded-xl border">1</button>
@@ -28,11 +33,20 @@
 
     <section id="result" class="hidden mt-6 card bg-white rounded-2xl p-6">
       <div id="mbtiBadge" class="text-lg font-bold mb-4"></div>
-      <div id="bioList" class="grid gap-3 mb-4"></div>
+      <div id="bioList" class="grid gap-3 mb-6"></div>
+      <details class="bg-gray-50 rounded-xl p-4">
+        <summary class="cursor-pointer font-semibold">README.md 스니펫 보기</summary>
+        <pre id="readmeSnippet" class="mt-3 overflow-x-auto text-sm p-3 rounded-lg bg-white border"></pre>
+      </details>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <button id="retryBtn" class="px-4 py-2 rounded-lg border">다시 하기</button>
+        <button id="shareBtn" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">결과 링크 복사</button>
+      </div>
     </section>
   </main>
 
   <script>
+  // ===== 질문 세트 =====
   const questions = [
     { t: '아침에 눈을 떴을 때, 먼저 하는 건?', a1: '핸드폰 확인', a2: '물 한잔 마시기', axis: 'P', dir: [ +1, -1 ] },
     { t: '약속이 취소됐을 때, 너의 반응은?', a1: '휴… 살았다', a2: '아쉬워서 다른 약속을 잡음', axis: 'E', dir: [ -1, +1 ] },
@@ -45,23 +59,35 @@
     { t: '문제에 부딪히면 우선순위는?', a1: '빨리 해결책부터 찾는다', a2: '왜 생겼는지 원인 분석', axis: 'N', dir: [ -1, +1 ] },
     { t: '더 끌리는 말은?', a1: '새로운 경험이 너를 성장시켜', a2: '꾸준함이 결국 너를 지켜줘', axis: 'P', dir: [ +1, -1 ] },
   ];
+
+  // ===== 상태 & 엘리먼트 =====
   let idx=0; const scores={E:0,N:0,T:0,P:0};
+  const $ = s=>document.querySelector(s);
+  const qText=$('#qText');
+  const opt1=$('#opt1');
+  const opt2=$('#opt2');
+  const mbtiBadge=$('#mbtiBadge');
+  const bioList=$('#bioList');
+  const quiz=$('#quiz');
+  const intro=$('#intro');
+  const result=$('#result');
+  const startBtn=$('#startBtn');
+  const progressLabel=$('#progressLabel');
+  const progressBar=$('#progressBar');
+  const readmeSnippet=$('#readmeSnippet');
+  const retryBtn=$('#retryBtn');
+  const shareBtn=$('#shareBtn');
 
-  const qText=document.getElementById('qText');
-  const opt1=document.getElementById('opt1');
-  const opt2=document.getElementById('opt2');
-  const mbtiBadge=document.getElementById('mbtiBadge');
-  const bioList=document.getElementById('bioList');
-  const quiz=document.getElementById('quiz');
-  const intro=document.getElementById('intro');
-  const result=document.getElementById('result');
-  const startBtn=document.getElementById('startBtn');
-
+  function updateProgress(){
+    progressLabel.textContent = `${idx + 1} / ${questions.length}`;
+    progressBar.style.width = `${((idx+1)/questions.length)*100}%`;
+  }
   function renderQuestion(){
     const q=questions[idx];
     qText.textContent=q.t;
     opt1.textContent='1) '+q.a1;
     opt2.textContent='2) '+q.a2;
+    updateProgress();
   }
   function applyChoice(choice){
     const q=questions[idx];
@@ -71,14 +97,19 @@
     const type=`${scores.E>=0?'E':'I'}${scores.N>=0?'N':'S'}${scores.T>=0?'T':'F'}${scores.P>=0?'P':'J'}`;
     mbtiBadge.textContent=type;
     renderPresetBios(type);
+    readmeSnippet.textContent = makeReadmeSnippet(type);
     intro.classList.add('hidden'); quiz.classList.add('hidden'); result.classList.remove('hidden');
+    const params=new URLSearchParams({picks:'done',type});
+    history.replaceState({},'',location.pathname+'?'+params.toString());
   }
 
   startBtn.addEventListener('click',()=>{intro.classList.add('hidden'); quiz.classList.remove('hidden'); idx=0; renderQuestion();});
   opt1.addEventListener('click',()=>{applyChoice(1); if(++idx<questions.length)renderQuestion(); else finalize();});
   opt2.addEventListener('click',()=>{applyChoice(2); if(++idx<questions.length)renderQuestion(); else finalize();});
+  retryBtn.addEventListener('click',()=>{location.href=location.pathname;});
+  shareBtn.addEventListener('click',async()=>{await navigator.clipboard.writeText(location.href); toast('링크 복사 완료!');});
 
-  // MBTI별 추천 Bio 문구 10개씩
+  // ===== Bio 프리셋 (16유형 × 10개) =====
   const bioPresets={
     ENTP:[
       {en:"Always chasing the next big idea.",kr:"늘 다음 큰 아이디어를 좇는다."},
@@ -92,17 +123,17 @@
       {en:"I don’t follow paths, I create them.",kr:"길을 따르지 않고, 길을 만든다."},
       {en:"Fun is my debugging tool.",kr:"재미가 나의 디버깅 도구다."},
     ],
-    INTJ:[
-      {en:"Systems over noise.",kr:"소음보다 시스템."},
-      {en:"Plans are temporary, vision is permanent.",kr:"계획은 임시, 비전은 영원."},
-      {en:"Quietly building the future.",kr:"조용히 미래를 설계한다."},
-      {en:"Architecture first, code second.",kr:"아키텍처가 먼저, 코드는 그 다음."},
-      {en:"I trust logic over luck.",kr:"나는 운보다 논리를 신뢰한다."},
-      {en:"Efficiency is elegance.",kr:"효율은 곧 우아함이다."},
-      {en:"Long-term thinker, short-term executor.",kr:"장기적 사고, 단기적 실행."},
-      {en:"Structure brings freedom.",kr:"구조가 자유를 만든다."},
-      {en:"Less talk, more architecture.",kr:"말보다 아키텍처."},
-      {en:"Strategy is my superpower.",kr:"전략이 나의 초능력이다."},
+    ENTJ:[
+      {en:"Lead with vision, execute with discipline.",kr:"비전으로 이끌고 규율로 실행한다."},
+      {en:"Goals > excuses.",kr:"목표가 변명보다 크다."},
+      {en:"Strategy today, results tomorrow.",kr:"오늘은 전략, 내일은 결과."},
+      {en:"I turn plans into shipped code.",kr:"계획을 배포된 코드로 바꾼다."},
+      {en:"Ownership is my default.",kr:"오너십은 나의 기본값."},
+      {en:"Direct, decisive, delivered.",kr:"직설적, 결단적, 납품완료."},
+      {en:"Organize chaos into systems.",kr:"혼돈을 시스템으로 조직한다."},
+      {en:"Roadmaps, not roadblocks.",kr:"장애물이 아닌 로드맵을 만든다."},
+      {en:"Optimize teams, not just code.",kr:"코드만이 아니라 팀을 최적화한다."},
+      {en:"Winners ship.",kr:"승자는 배포한다."},
     ],
     ENFP:[
       {en:"Energy is contagious, and I’m the source.",kr:"에너지는 전염된다, 나는 그 근원이다."},
@@ -116,6 +147,126 @@
       {en:"I bring color into commits.",kr:"나는 커밋에 색을 불어넣는다."},
       {en:"Optimism is my default branch.",kr:"낙관이 나의 기본 브랜치다."},
     ],
+    ENFJ:[
+      {en:"Build people, then build products.",kr:"사람을 먼저 세우고, 제품을 만든다."},
+      {en:"Empathy that ships.",kr:"배포로 이어지는 공감."},
+      {en,"Align hearts and roadmaps.":"마음과 로드맵을 정렬한다."},
+      {en:"Clear goals, kinder processes.",kr:"목표는 분명하게, 과정은 친절하게."},
+      {en:"I connect dots and people.",kr:"점과 사람을 연결한다."},
+      {en:"Feedback is a feature.",kr:"피드백은 하나의 기능이다."},
+      {en:"Culture is compounding interest.",kr:"문화는 복리처럼 쌓인다."},
+      {en:"Lead with listening.",kr:"경청으로 리드한다."},
+      {en:"Serve, coordinate, deliver.",kr:"섬기고, 조율하고, 납품한다."},
+      {en:"Collaboration is my compiler.",kr:"협업은 나의 컴파일러다."},
+    ],
+    ESTP:[
+      {en:"Try now, refine live.",kr:"지금 시도하고, 현장에서 다듬는다."},
+      {en:"Move fast, fix fast.",kr:"빠르게 움직이고, 빠르게 고친다."},
+      {en:"Ship or it didn’t happen.",kr:"배포 없으면 일어난 게 아니다."},
+      {en:"Hands-on beats hand-wavy.",kr:"말보다 손으로 증명한다."},
+      {en:"Latency kills—action heals.",kr:"지연은 해롭고, 행동은 치유한다."},
+      {en:"Prototype > powerpoint.",kr:"파워포인트보다 프로토타입."},
+      {en:"Risks calculated, buttons clicked.",kr:"위험은 계산하고, 버튼은 누른다."},
+      {en:"Break it to learn it.",kr:"부숴봐야 배운다."},
+      {en:"Field-tested code.",kr:"현장에서 검증한 코드."},
+      {en:"Sprint, then iterate.",kr:"스프린트하고, 반복한다."},
+    ],
+    ESTJ:[
+      {en:"Structure + execution = results.",kr:"구조 + 실행 = 결과."},
+      {en:"Standards enforce quality.",kr:"표준이 품질을 지킨다."},
+      {en:"Clear roles, clean releases.",kr:"역할은 명확하게, 릴리스는 깔끔하게."},
+      {en:"Checklists ship products.",kr:"체크리스트가 제품을 배포한다."},
+      {en:"SLA mindset in my code.",kr:"코드에도 SLA 마인드."},
+      {en:"Deadlines respected, scope protected.",kr:"마감은 존중하고, 범위는 보호한다."},
+      {en:"Process that scales.",kr:"스케일되는 프로세스."},
+      {en:"Budgets of time, not waste.",kr:"시간 예산은 있어도 낭비는 없다."},
+      {en:"Keep it consistent.",kr:"일관성을 지킨다."},
+      {en:"Pragmatic and predictable.",kr:"실용적이고 예측 가능하다."},
+    ],
+    ESFP:[
+      {en:"Make it useful and delightful.",kr:"유용하고 즐거운 걸 만든다."},
+      {en:"Pixels with personality.",kr:"개성이 담긴 픽셀."},
+      {en:"Demo-ready, everyday-ready.",kr:"데모도, 일상도 준비 완료."},
+      {en:"If it’s not fun, it won’t stick.",kr:"재미없으면 남지 않는다."},
+      {en:"Users first, party included.",kr:"사용자가 먼저, 즐거움은 기본."},
+      {en:"Shine in features, not slides.",kr:"슬라이드가 아니라 기능으로 빛난다."},
+      {en:"I turn ideas into experiences.",kr:"아이디어를 경험으로 바꾼다."},
+      {en:"Happy paths matter.",kr:"행복 경로가 중요하다."},
+      {en:"Music on, UI on.",kr:"음악 켜고, UI 켠다."},
+      {en:"Vibes meet usability.",kr:"바이브와 사용성이 만난다."},
+    ],
+    ESFJ:[
+      {en:"Ship together or don’t ship.",kr:"함께 배포하든지, 배포하지 않든지."},
+      {en:"I keep teams synced.",kr:"팀의 싱크를 맞춘다."},
+      {en:"Docs are acts of service.",kr:"문서는 서비스의 일환이다."},
+      {en:"On-call with care.",kr:"배려로 온콜한다."},
+      {en:"Make handoffs painless.",kr:"인수인계를 고통 없이."},
+      {en:"Reliability people can feel.",kr:"사람이 체감하는 신뢰성."},
+      {en:"Healthy rituals, healthy releases.",kr:"건강한 리추얼, 건강한 릴리스."},
+      {en:"Praise in public, fix in private.",kr:"공개적으로 칭찬, 비공개로 수정."},
+      {en:"I manage the glue work.",kr:"보이지 않는 연결 작업을 관리한다."},
+      {en:"Community over ego.",kr:"자아보다 공동체."},
+    ],
+    INTP:[
+      {en:"Logic is my playground.",kr:"논리가 나의 놀이터다."},
+      {en:"Curiosity debugs everything.",kr:"호기심이 모든 걸 디버그한다."},
+      {en:"I ask why until it compiles.",kr:"컴파일될 때까지 왜를 묻는다."},
+      {en:"Hypothesize, test, iterate.",kr:"가설·검증·반복."},
+      {en:"Clean abstractions, messy notebooks.",kr:"추상은 깔끔, 노트는 난장판."},
+      {en:"Premature optimization? Sometimes fun.",kr:"조기 최적화? 가끔은 재미다."},
+      {en:"I optimize ideas before code.",kr:"코드 전에 아이디어를 최적화한다."},
+      {en:"Edge cases are my cases.",kr:"엣지 케이스는 나의 케이스."},
+      {en:"Prove it with a REPL.",kr:"REPL로 증명한다."},
+      {en:"Thought experiments, real results.",kr:"사고 실험, 실제 결과."},
+    ],
+    INTJ:[
+      {en:"Systems over noise.",kr:"소음보다 시스템."},
+      {en:"Plans are temporary, vision is permanent.",kr:"계획은 임시, 비전은 영원."},
+      {en:"Quietly building the future.",kr:"조용히 미래를 설계한다."},
+      {en:"Architecture first, code second.",kr:"아키텍처가 먼저, 코드는 그 다음."},
+      {en:"I trust logic over luck.",kr:"나는 운보다 논리를 신뢰한다."},
+      {en:"Efficiency is elegance.",kr:"효율은 곧 우아함이다."},
+      {en:"Long-term thinker, short-term executor.",kr:"장기적 사고, 단기적 실행."},
+      {en:"Structure brings freedom.",kr:"구조가 자유를 만든다."},
+      {en:"Less talk, more architecture.",kr:"말보다 아키텍처."},
+      {en:"Strategy is my superpower.",kr:"전략이 나의 초능력이다."},
+    ],
+    INFP:[
+      {en:"Values guide my version control.",kr:"가치가 내 버전 관리를 이끈다."},
+      {en:"Meaning before metrics.",kr:"지표보다 의미가 먼저다."},
+      {en:"Code with conscience.",kr:"양심을 담아 코딩한다."},
+      {en:"Quiet conviction, steady commits.",kr:"조용한 확신, 꾸준한 커밋."},
+      {en:"Human-first features.",kr:"사람이 먼저인 기능."},
+      {en:"I care about impact.",kr:"나는 영향력을 신경 쓴다."},
+      {en:"Default to kindness, not silence.",kr:"침묵보다 친절이 기본."},
+      {en:"Purpose-driven pull requests.",kr:"목적 중심의 PR."},
+      {en:"Small acts, big effects.",kr:"작은 행동, 큰 효과."},
+      {en:"Authenticity scales.",kr:"진정성이 스케일한다."},
+    ],
+    INFJ:[
+      {en:"Systems with soul.",kr:"영혼 있는 시스템."},
+      {en:"Design for depth, not noise.",kr:"소음이 아닌 깊이를 설계한다."},
+      {en:"Quiet insight, precise action.",kr:"조용한 통찰, 정밀한 행동."},
+      {en:"Anticipate needs, reduce friction.",kr:"니즈를 예측하고 마찰을 줄인다."},
+      {en:"Align vision and values.",kr:"비전과 가치를 정렬한다."},
+      {en:"Long-term integrity over quick hacks.",kr:"빠른 핵보다 장기적 진정성."},
+      {en:"Gentle interfaces, strong backends.",kr:"부드러운 인터페이스, 강한 백엔드."},
+      {en:"Make complexity humane.",kr:"복잡함을 인간적으로 만든다."},
+      {en:"Empathy as architecture.",kr:"공감으로 아키텍처를 세운다."},
+      {en:"Thoughtful by default.",kr:"기본값은 사려 깊음."},
+    ],
+    ISTP:[
+      {en:"If it moves, I’ll tune it.",kr:"움직이면 튜닝한다."},
+      {en:"Measure twice, refactor once.",kr:"두 번 재고 한 번 리팩터."},
+      {en:"Tools over talk.",kr:"말보다 도구."},
+      {en:"Minimal UI, maximal control.",kr:"미니멀 UI, 맥시멀 제어."},
+      {en:"I fix it at the source.",kr:"근원에서 고친다."},
+      {en:"Benchmarks beat opinions.",kr:"벤치마크가 의견을 이긴다."},
+      {en:"I read the manual… and rewrite it.",kr:"매뉴얼을 읽고… 다시 쓴다."},
+      {en:"Silence, solder, success.",kr:"침묵, 납땜, 성공."},
+      {en:"Low-level, high impact.",kr:"로우레벨, 하이 임팩트."},
+      {en:"Ship small, optimize hard.",kr:"작게 배포, 강하게 최적화."},
+    ],
     ISTJ:[
       {en:"Reliability over hype.",kr:"과장보다 신뢰."},
       {en:"Code that lasts, not trends that fade.",kr:"사라질 트렌드가 아닌, 오래가는 코드."},
@@ -127,20 +278,122 @@
       {en:"Plans protect productivity.",kr:"계획이 생산성을 지킨다."},
       {en:"I fix before it breaks.",kr:"부서지기 전에 고친다."},
       {en:"Trust is my coding standard.",kr:"신뢰가 나의 코딩 표준이다."},
-    ]
+    ],
+    ISFP:[
+      {en:"Quiet craft, bold results.",kr:"조용한 공예, 대담한 결과."},
+      {en:"Details you can feel.",kr:"손끝으로 느껴지는 디테일."},
+      {en:"Aesthetic meets ergonomics.",kr:"미학과 사용성이 만난다."},
+      {en:"I design by listening.",kr:"귀로 듣고 디자인한다."},
+      {en:"Minimal, meaningful, maintainable.",kr:"미니멀, 의미, 유지보수."},
+      {en:"Smooth edges, sharp performance.",kr:"부드러운 모서리, 날카로운 성능."},
+      {en:"Harmony in components.",kr:"컴포넌트의 조화."},
+      {en:"Gentle UX, strong intent.",kr:"부드러운 UX, 강한 의도."},
+      {en:"Function with feeling.",kr:"감각을 담은 기능."},
+      {en:"Calm code, clear value.",kr:"차분한 코드, 분명한 가치."},
+    ],
+    ISFJ:[
+      {en:"Safeguard data, support people.",kr:"데이터를 지키고, 사람을 돕는다."},
+      {en:"I patch before panic.",kr:"당황하기 전에 패치한다."},
+      {en:"Quietly preventing outages.",kr:"조용히 장애를 예방한다."},
+      {en:"Service with stability.",kr:"안정으로 제공하는 서비스."},
+      {en:"Backups are love letters to tomorrow.",kr:"백업은 내일을 위한 연서."},
+      {en:"Respect the legacy, improve the present.",kr:"레거시를 존중하고 현재를 개선한다."},
+      {en:"Documentation as care.",kr:"배려로서의 문서화."},
+      {en:"Guardrails, not gates.",kr:"문턱이 아닌 가드레일."},
+      {en:"Consistency comforts users.",kr:"일관성이 사용자에게 안심을 준다."},
+      {en:"Reliability you can trust.",kr:"믿을 수 있는 신뢰성."},
+    ],
+    ESFP:[
+      {en:"Make it useful and delightful.",kr:"유용하고 즐거운 걸 만든다."},
+      {en:"Pixels with personality.",kr:"개성이 담긴 픽셀."},
+      {en:"Demo-ready, everyday-ready.",kr:"데모도, 일상도 준비 완료."},
+      {en:"If it’s not fun, it won’t stick.",kr:"재미없으면 남지 않는다."},
+      {en:"Users first, party included.",kr:"사용자가 먼저, 즐거움은 기본."},
+      {en:"Shine in features, not slides.",kr:"슬라이드가 아니라 기능으로 빛난다."},
+      {en:"I turn ideas into experiences.",kr:"아이디어를 경험으로 바꾼다."},
+      {en:"Happy paths matter.",kr:"행복 경로가 중요하다."},
+      {en:"Music on, UI on.",kr:"음악 켜고, UI 켠다."},
+      {en:"Vibes meet usability.",kr:"바이브와 사용성이 만난다."},
+    ],
+    ESFJ:[
+      {en:"Ship together or don’t ship.",kr:"함께 배포하든지, 배포하지 않든지."},
+      {en:"I keep teams synced.",kr:"팀의 싱크를 맞춘다."},
+      {en:"Docs are acts of service.",kr:"문서는 서비스의 일환이다."},
+      {en:"On-call with care.",kr:"배려로 온콜한다."},
+      {en:"Make handoffs painless.",kr:"인수인계를 고통 없이."},
+      {en:"Reliability people can feel.",kr:"사람이 체감하는 신뢰성."},
+      {en:"Healthy rituals, healthy releases.",kr:"건강한 리추얼, 건강한 릴리스."},
+      {en:"Praise in public, fix in private.",kr:"공개적으로 칭찬, 비공개로 수정."},
+      {en:"I manage the glue work.",kr:"보이지 않는 연결 작업을 관리한다."},
+      {en:"Community over ego.",kr:"자아보다 공동체."},
+    ],
+    ESTP:[
+      {en:"Try now, refine live.",kr:"지금 시도하고, 현장에서 다듬는다."},
+      {en:"Move fast, fix fast.",kr:"빠르게 움직이고, 빠르게 고친다."},
+      {en:"Ship or it didn’t happen.",kr:"배포 없으면 일어난 게 아니다."},
+      {en:"Hands-on beats hand-wavy.",kr:"말보다 손으로 증명한다."},
+      {en:"Latency kills—action heals.",kr:"지연은 해롭고, 행동은 치유한다."},
+      {en:"Prototype > powerpoint.",kr:"파워포인트보다 프로토타입."},
+      {en:"Risks calculated, buttons clicked.",kr:"위험은 계산하고, 버튼은 누른다."},
+      {en:"Break it to learn it.",kr:"부숴봐야 배운다."},
+      {en:"Field-tested code.",kr:"현장에서 검증한 코드."},
+      {en:"Sprint, then iterate.",kr:"스프린트하고, 반복한다."},
+    ],
+    ESTJ:[
+      {en:"Structure + execution = results.",kr:"구조 + 실행 = 결과."},
+      {en:"Standards enforce quality.",kr:"표준이 품질을 지킨다."},
+      {en:"Clear roles, clean releases.",kr:"역할은 명확하게, 릴리스는 깔끔하게."},
+      {en:"Checklists ship products.",kr:"체크리스트가 제품을 배포한다."},
+      {en:"SLA mindset in my code.",kr:"코드에도 SLA 마인드."},
+      {en:"Deadlines respected, scope protected.",kr:"마감은 존중하고, 범위는 보호한다."},
+      {en:"Process that scales.",kr:"스케일되는 프로세스."},
+      {en:"Budgets of time, not waste.",kr:"시간 예산은 있어도 낭비는 없다."},
+      {en:"Keep it consistent.",kr:"일관성을 지킨다."},
+      {en:"Pragmatic and predictable.",kr:"실용적이고 예측 가능하다."},
+    ],
   };
+
+  // 보정: 누락된 키가 없도록 16유형 완성
+  (function fillMissing(){
+    const all=['ENTP','ENTJ','ENFP','ENFJ','ESTP','ESTJ','ESFP','ESFJ','INTP','INTJ','INFP','INFJ','ISTP','ISTJ','ISFP','ISFJ'];
+    const placeholders={en:'(add your custom line)',kr:'(문구를 추가하세요)'};
+    all.forEach(k=>{ if(!bioPresets[k]) bioPresets[k]=[...Array(10)].map(()=>placeholders); });
+  })();
 
   function renderPresetBios(type){
     bioList.innerHTML='';
-    if(!bioPresets[type])return;
-    bioPresets[type].forEach((b,i)=>{
+    const list=bioPresets[type]||[];
+    list.forEach((b,i)=>{
       const box=document.createElement('div');
-      box.className='p-3 border rounded-xl bg-gray-50';
-      box.innerHTML=`<div class='text-sm text-gray-500 mb-1'>Preset #${i+1}</div><div>🇺🇸 ${b.en}</div><div>🇰🇷 ${b.kr}</div>`;
+      box.className='p-4 border rounded-xl bg-gray-50';
+      box.innerHTML=`<div class='text-sm text-gray-500 mb-1'>Preset #${i+1}</div>
+        <button class='copyBtn text-left hover:bg-white p-2 rounded w-full' data-text="${escapeHtml(b.en)}">🇺🇸 ${escapeHtml(b.en)}</button>
+        <button class='copyBtn text-left hover:bg-white p-2 rounded w-full' data-text="${escapeHtml(b.kr)}">🇰🇷 ${escapeHtml(b.kr)}</button>`;
       bioList.appendChild(box);
     });
+    bioList.querySelectorAll('.copyBtn').forEach(btn=>{
+      btn.addEventListener('click',async(e)=>{
+        const text=e.currentTarget.getAttribute('data-text');
+        await navigator.clipboard.writeText(unescapeHtml(text));
+        toast('복사 완료!');
+      });
+    });
   }
+
+  function makeReadmeSnippet(type){
+    return `## 👋 Hi, I'm ${type} flavored\n\n⚡ **Energy = Productivity**\n\n🎉 **Excitement = Identity**\n`;
+  }
+
+  function toast(msg){
+    const t=document.createElement('div');
+    t.textContent=msg;
+    t.className='fixed bottom-4 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-lg opacity-0';
+    document.body.appendChild(t);
+    requestAnimationFrame(()=>{t.style.transition='opacity .2s'; t.style.opacity='1';});
+    setTimeout(()=>{t.style.opacity='0'; setTimeout(()=>t.remove(),200);},1200);
+  }
+  function escapeHtml(s){return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');}
+  function unescapeHtml(s){return s.replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','\"').replaceAll('&amp;','&');}
   </script>
 </body>
 </html>
-
