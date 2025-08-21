@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MBTI 스타일 심리테스트 + GitHub Bio 생성기</title>
+  <meta name="description" content="10문항으로 ENTP/INTJ 등 MBTI 스타일 해석과 GitHub Bio 한 줄 문구를 자동 생성합니다." />
+  <meta property="og:title" content="MBTI 스타일 심리테스트 + GitHub Bio 생성기" />
+  <meta property="og:description" content="10문항으로 스타일 해석 + 깃허브 Bio 문구 추천" />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --bg: 245 245 246; --ink: 23 23 24; }
+    body { font-family: 'Pretendard', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .card { box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+    .kbd { border:1px solid #e5e7eb; border-bottom-width:2px; padding:.15rem .4rem; border-radius:.4rem; font-weight:600; font-size:.8rem;}
+  </style>
+</head>
+<body class="min-h-screen bg-[rgb(var(--bg))] text-[rgb(var(--ink))]">
+  <main class="max-w-3xl mx-auto p-6">
+    <header class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 grid place-items-center text-white text-xl">⚡</div>
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold">MBTI 스타일 심리테스트 + GitHub Bio 생성기</h1>
+        <p class="text-sm text-gray-600">10문항 · 결과 해석 · 한 줄 Bio 자동 생성 · 클립보드 복사</p>
+      </div>
+    </header>
+
+    <section id="intro" class="card bg-white rounded-2xl p-6">
+      <p class="mb-4">아래 <strong>시작하기</strong>를 누르면 10개의 간단한 질문이 나와. 모두 끝나면 네 MBTI <em>스타일</em>을 해석하고, 그 결과에 맞춘 <strong>GitHub Bio</strong> 문구(국/영)도 자동으로 추천해줄게.</p>
+      <button id="startBtn" class="mt-2 px-5 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 active:scale-[.99]">시작하기</button>
+    </section>
+
+    <section id="quiz" class="hidden mt-6 card bg-white rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div id="progressLabel" class="text-sm text-gray-600">1 / 10</div>
+        <div class="w-40 h-2 bg-gray-100 rounded-full overflow-hidden"><div id="progressBar" class="h-full bg-indigo-600" style="width:10%"></div></div>
+      </div>
+      <h2 id="qText" class="text-xl font-bold mb-4">질문</h2>
+      <div class="grid gap-3">
+        <button id="opt1" class="px-5 py-4 rounded-xl border border-gray-200 hover:border-indigo-400 text-left">1</button>
+        <button id="opt2" class="px-5 py-4 rounded-xl border border-gray-200 hover:border-indigo-400 text-left">2</button>
+      </div>
+    </section>
+
+    <section id="result" class="hidden mt-6 card bg-white rounded-2xl p-6">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="kbd">Result</div>
+        <div id="mbtiBadge" class="text-lg font-bold"></div>
+      </div>
+      <p id="headline" class="text-xl md:text-2xl font-bold mb-3"></p>
+      <div id="axisBars" class="grid gap-3 mb-6"></div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <article class="bg-gray-50 rounded-xl p-4">
+          <h3 class="font-semibold mb-2">요약 해석</h3>
+          <ul id="summaryList" class="list-disc pl-5 space-y-1"></ul>
+        </article>
+        <article class="bg-gray-50 rounded-xl p-4">
+          <h3 class="font-semibold mb-2">강점 · 주의 포인트</h3>
+          <ul id="tipsList" class="list-disc pl-5 space-y-1"></ul>
+        </article>
+      </div>
+
+      <hr class="my-6" />
+
+      <div class="mb-3 flex items-center gap-2">
+        <div class="kbd">GitHub Bio</div>
+        <span class="text-sm text-gray-600">국/영 자동 생성 · 클릭 시 복사</span>
+      </div>
+      <div id="bioList" class="grid gap-3 mb-4"></div>
+
+      <details class="bg-gray-50 rounded-xl p-4">
+        <summary class="cursor-pointer font-semibold">README.md 스니펫 보기</summary>
+        <pre id="readmeSnippet" class="mt-3 overflow-x-auto text-sm p-3 rounded-lg bg-white border"></pre>
+      </details>
+
+      <div class="mt-6 flex flex-wrap gap-3">
+        <button id="retryBtn" class="px-4 py-2 rounded-lg border">다시 하기</button>
+        <button id="shareBtn" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">결과 링크 복사</button>
+      </div>
+    </section>
+
+    <section id="deploy" class="mt-6 text-sm text-gray-600">
+      <h3 class="font-semibold mb-2">GitHub Pages로 배포하는 법</h3>
+      <ol class="list-decimal pl-5 space-y-1">
+        <li>이 파일을 <strong>index.html</strong>로 저장해서 새 레포에 푸시한다.</li>
+        <li>GitHub → 레포 <strong>Settings &gt; Pages</strong> → Deploy from a branch → <strong>main / root</strong> 선택.</li>
+        <li>저장 후 몇 분 뒤 <strong>Pages URL</strong>이 생성되면 접속한다.</li>
+      </ol>
+    </section>
+  </main>
+
+  <script>
+  // ===== 질문 정의 (10문항) =====
+  const questions = [
+    { t: '아침에 눈을 떴을 때, 먼저 하는 건?', a1: '핸드폰 확인', a2: '물 한잔 마시기', axis: 'P', dir: [ +1, -1 ] },
+    { t: '약속이 취소됐을 때, 너의 반응은?', a1: '휴… 살았다', a2: '아쉬워서 다른 약속을 잡음', axis: 'E', dir: [ -1, +1 ] },
+    { t: '카페에서 메뉴 고를 때', a1: '늘 마시던 걸 시킴', a2: '새로운 메뉴 도전', axis: 'N', dir: [ -1, +1 ] },
+    { t: '길 가다 모르는 사람이 길을 묻는다', a1: '간단히 방향만 알려줌', a2: '지도 열어 자세히 안내', axis: 'T', dir: [ +1, -1 ] },
+    { t: '하루를 돌아봤을 때 더 중요한 것은?', a1: '오늘 내가 한 일(성과)', a2: '오늘 내가 느낀 감정', axis: 'T', dir: [ +1, -1 ] },
+    { t: '여행 일정이 꼬였다', a1: '뭐 어때, 일단 즐기자!', a2: '계획을 다시 세운다', axis: 'P', dir: [ +1, -1 ] },
+    { t: '팀 프로젝트에서 나는 주로…', a1: '아이디어 뿌리는 사람', a2: '흐트러진 걸 정리하는 사람', axis: 'P', dir: [ +1, -1 ] },
+    { t: '집에 혼자 있을 때 나는…', a1: '음악/영상 틀고 뭔가 함', a2: '조용히 멍 때리거나 책', axis: 'E', dir: [ +1, -1 ] },
+    { t: '문제에 부딪히면 우선순위는?', a1: '빨리 해결책부터 찾는다', a2: '왜 생겼는지 원인 분석', axis: 'N', dir: [ -1, +1 ] },
+    { t: '더 끌리는 말은?', a1: '새로운 경험이 너를 성장시켜', a2: '꾸준함이 결국 너를 지켜줘', axis: 'P', dir: [ +1, -1 ] },
+  ];
+
+  // ===== 상태 =====
+  let idx = 0;
+  const scores = { E: 0, N: 0, T: 0, P: 0 }; // 각 축 양수면 앞글자(E/N/T/P), 음수면 반대(I/S/F/J)
+  const picks = [];
+
+  // ===== DOM =====
+  const $ = (s) => document.querySelector(s);
+  const intro = $('#intro');
+  const quiz = $('#quiz');
+  const result = $('#result');
+  const startBtn = $('#startBtn');
+  const progressLabel = $('#progressLabel');
+  const progressBar = $('#progressBar');
+  const qText = $('#qText');
+  const opt1 = $('#opt1');
+  const opt2 = $('#opt2');
+  const mbtiBadge = $('#mbtiBadge');
+  const headline = $('#headline');
+  const axisBars = $('#axisBars');
+  const summaryList = $('#summaryList');
+  const tipsList = $('#tipsList');
+  const bioList = $('#bioList');
+  const readmeSnippet = $('#readmeSnippet');
+  const retryBtn = $('#retryBtn');
+  const shareBtn = $('#shareBtn');
+
+  // ===== 유틸 =====
+  function updateProgress() {
+    progressLabel.textContent = `${idx + 1} / ${questions.length}`;
+    progressBar.style.width = `${((idx+1)/questions.length)*100}%`;
+  }
+
+  function renderQuestion() {
+    const q = questions[idx];
+    qText.textContent = q.t;
+    opt1.textContent = '1) ' + q.a1;
+    opt2.textContent = '2) ' + q.a2;
+    updateProgress();
+  }
+
+  function applyChoice(choice) {
+    const q = questions[idx];
+    const delta = q.dir[choice-1];
+    scores[q.axis] += delta;
+    picks.push(choice);
+  }
+
+  function tieBreak(axes) {
+    // 간단 타이브레이커: P가 양수면 새로움 쪽, 음수면 안정 쪽 우선
+    const letter = axes.letter;
+    const val = scores[letter];
+    if (val > 0) return letter;
+    if (val < 0) return axes.opposite;
+    // tie
+    if (letter === 'E') return scores.P >= 0 ? 'E' : 'I';
+    if (letter === 'N') return scores.P >= 0 ? 'N' : 'S';
+    if (letter === 'T') return scores.N >= 0 ? 'T' : 'F';
+    if (letter === 'P') return scores.N >= 0 ? 'P' : 'J';
+    return letter; // fallback
+  }
+
+  function finalize() {
+    const E = tieBreak({letter:'E', opposite:'I'});
+    const N = tieBreak({letter:'N', opposite:'S'});
+    const T = tieBreak({letter:'T', opposite:'F'});
+    const P = tieBreak({letter:'P', opposite:'J'});
+    const type = `${E}${N}${T}${P}`;
+
+    // 배지/헤드라인
+    mbtiBadge.textContent = type;
+    headline.textContent = headlineByType(type);
+
+    // 축 게이지
+    axisBars.innerHTML = '';
+    const axes = [
+      { k:'E/I', pos: scoreToPct(scores.E), left:'I', right:'E' },
+      { k:'N/S', pos: scoreToPct(scores.N), left:'S', right:'N' },
+      { k:'T/F', pos: scoreToPct(scores.T), left:'F', right:'T' },
+      { k:'P/J', pos: scoreToPct(scores.P), left:'J', right:'P' },
+    ];
+    axes.forEach(ax => axisBars.appendChild(renderAxis(ax)));
+
+    // 요약/팁
+    renderSummaryAndTips({E,N,T,P,type});
+
+    // Bio 추천 + README 스니펫
+    const bios = generateBios({E,N,T,P,type});
+    renderBios(bios);
+    readmeSnippet.textContent = makeReadmeSnippet(type, bios[0]);
+
+    // 결과 섹션 표시
+    intro.classList.add('hidden');
+    quiz.classList.add('hidden');
+    result.classList.remove('hidden');
+
+    // URL 공유용 쿼리 저장
+    const params = new URLSearchParams({ picks: picks.join('') });
+    history.replaceState({}, '', location.pathname + '?' + params.toString());
+  }
+
+  function scoreToPct(v){
+    // v in roughly [-4..+4] for P, [-2..+2] others → normalize to 0..100 (right side is 앞글자)
+    const max = 4; // 안전한 정규화
+    const pct = Math.round(((v + max) / (2*max)) * 100);
+    return Math.min(100, Math.max(0, pct));
+  }
+
+  function renderAxis({k,pos,left,right}){
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="text-sm font-medium mb-1">${k}</div>
+      <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+        <div class="h-full bg-gradient-to-r from-fuchsia-500 to-indigo-600" style="width:${pos}%"></div>
+      </div>
+      <div class="flex justify-between text-xs text-gray-600"><span>${left}</span><span>${right}</span></div>
+    `;
+    return wrap;
+  }
+
+  function headlineByType(type){
+    const map = {
+      ENTP: '아이디어 폭주 엔진, 즉흥적 발명가',
+      INTJ: '시스템 설계자, 차분한 전략가',
+      INTP: '개념탐험가, 논리 최적화러',
+      ENTJ: '조직화된 추진가, 목표지향 리더',
+      ENFP: '가능성 수집가, 에너지 전파자',
+      INFJ: '통찰형 조율가, 의미 추구자',
+      ISTJ: '신뢰의 운영자, 디테일 장인',
+      ESTP: '현장 해결사, 액션 퍼포머',
+    };
+    // 기본값: 축 기반 헤드라인 생성
+    if (map[type]) return map[type];
+    let h = '';
+    h += (type[0]==='E' ? '사람에 강한 ' : '혼자 몰입하는 ');
+    h += (type[1]==='N' ? '아이디어형 ' : '현실 실행형 ');
+    h += (type[2]==='T' ? '논리파, ' : '공감파, ');
+    h += (type[3]==='P' ? '즉흥 드라이브' : '루틴 드라이브');
+    return h;
+  }
+
+  function renderSummaryAndTips({E,N,T,P,type}){
+    summaryList.innerHTML = '';
+    tipsList.innerHTML = '';
+    const sum = [];
+    sum.push(E==='E' ? '사람들과의 상호작용에서 에너지 상승.' : '조용한 환경에서 집중력 최대로 발휘.');
+    sum.push(N==='N' ? '새로움/가능성에 끌리고 실험을 즐김.' : '검증된 방법과 실체적 결과를 선호.');
+    sum.push(T==='T' ? '논리·효율·정확성에 민감.' : '맥락·관계·의도 같은 인간적인 요소를 중시.');
+    sum.push(P==='P' ? '유연·즉흥·빠른 반복에 강함.' : '계획·루틴·마감 관리에 강함.');
+    sum.forEach(s=>{ const li=document.createElement('li'); li.textContent=s; summaryList.appendChild(li); });
+
+    const tips = [];
+    if (P==='P') tips.push('큰 방향만 정하고 스몰 스텝으로 자주 배포하기(빠른 피드백 루프).');
+    if (P==='J') tips.push('변경 여지를 남기되, 마감·체크리스트를 시각화하여 유지.');
+    if (E==='E') tips.push('에너지 낮을 땐 사람 만남으로 리차지, 단 일정에 버퍼 두기.');
+    if (E==='I') tips.push('심층 작업 블록(예: 90분) 확보 후 회의는 묶어서 처리.');
+    if (N==='N') tips.push('아이디어 폭주 시 “한 줄 명세→작은 실험”으로 현실 고정.');
+    if (N==='S') tips.push('루틴 최적화 후 주 1회 “새로운 시도 타임”으로 확장.');
+    if (T==='T') tips.push('사람 이슈엔 Check-list 대신 “의도·감정” 질문 한 번 더.');
+    if (T==='F') tips.push('결정 시 근거 표기(왜 이게 더 나은지)로 팀 싱크 업.');
+    tips.forEach(t=>{ const li=document.createElement('li'); li.textContent=t; tipsList.appendChild(li); });
+  }
+
+  function generateBios({E,N,T,P,type}){
+    // 축 기반 템플릿 — 국/영 쌍으로 3개 제안
+    const en = {
+      E: 'People energy boosts my code',
+      I: 'Built in quiet, shipped with focus',
+      N: 'Chasing possibilities',
+      S: 'Grounded in reality',
+      T: 'Clarity over noise',
+      F: 'Empathy in the loop',
+      P: 'Iterate fast, ship often',
+      J: 'Plan smart, ship steady'
+    };
+    const kr = {
+      E: '사람 에너지로 코드를 달린다',
+      I: '고요에서 만들고 집중으로 배포한다',
+      N: '가능성을 좇는다',
+      S: '현실에 단단히 발 딛는다',
+      T: '소음보다 명확함',
+      F: '공감을 루프에 포함한다',
+      P: '빠르게 반복하고 자주 배포',
+      J: '영리하게 계획하고 안정적으로 배포'
+    };
+
+    // 기본 시그니처 — 사용자 대화에서 영감을 준 한 줄 (국/영)
+    const sigEN = 'Energy drives productivity, excitement defines identity.';
+    const sigKR = '에너지가 곧 생산성, 신남이 곧 정체성.';
+
+    const pair1 = [sigEN, sigKR];
+    const pair2 = [
+      `${en[E]} · ${en[N]}. ${en[P]}.`,
+      `${kr[E]} · ${kr[N]}. ${kr[P]}.`
+    ];
+    const pair3 = [
+      `${type} — ${en[T]}. ${en[S] ?? ''} ${en[J] ?? ''}`.trim(),
+      `${type} — ${kr[T]}. ${kr[S] ?? ''} ${kr[J] ?? ''}`.trim()
+    ];
+
+    // 깔끔하게 정리
+    const dedupe = (s) => s.replace(/\s+/g,' ').replace(/\s\./g,'.');
+    return [
+      { en: dedupe(pair1[0]), kr: dedupe(pair1[1]) },
+      { en: dedupe(pair2[0]), kr: dedupe(pair2[1]) },
+      { en: dedupe(pair3[0]), kr: dedupe(pair3[1]) },
+    ];
+  }
+
+  function renderBios(bios){
+    bioList.innerHTML = '';
+    bios.forEach((b,i)=>{
+      const box = document.createElement('div');
+      box.className = 'p-4 rounded-xl border hover:border-indigo-400 bg-white';
+      box.innerHTML = `
+        <div class="text-sm text-gray-500 mb-1">#${i+1}</div>
+        <div class="grid gap-1">
+          <button class="text-left hover:bg-gray-50 p-2 rounded copyBtn" data-text="${escapeHtml(b.en)}">🇺🇸 ${escapeHtml(b.en)}</button>
+          <button class="text-left hover:bg-gray-50 p-2 rounded copyBtn" data-text="${escapeHtml(b.kr)}">🇰🇷 ${escapeHtml(b.kr)}</button>
+        </div>
+      `;
+      bioList.appendChild(box);
+    });
+
+    bioList.querySelectorAll('.copyBtn').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const text = e.currentTarget.getAttribute('data-text');
+        await navigator.clipboard.writeText(unescapeHtml(text));
+        toast('복사 완료!');
+      });
+    });
+  }
+
+  function makeReadmeSnippet(type, topBio){
+    return `## 👋 Hi, I'm ${type} flavored\n\n⚡ **Energy = Productivity**\n\n🎉 **Excitement = Identity**\n\n> ${topBio.en}\n> ${topBio.kr}\n`;
+  }
+
+  function toast(msg){
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-lg opacity-0';
+    document.body.appendChild(t);
+    requestAnimationFrame(()=>{ t.style.transition='opacity .2s'; t.style.opacity='1'; });
+    setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),200); }, 1200);
+  }
+
+  function escapeHtml(s){
+    return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+  }
+  function unescapeHtml(s){
+    return s.replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','\"').replaceAll('&amp;','&');
+  }
+
+  // ===== 초기화 / 이벤트 =====
+  startBtn.addEventListener('click', ()=>{
+    intro.classList.add('hidden');
+    quiz.classList.remove('hidden');
+    idx = 0; Object.keys(scores).forEach(k=>scores[k]=0); picks.length = 0;
+    renderQuestion();
+  });
+
+  opt1.addEventListener('click', ()=>{
+    applyChoice(1);
+    if (++idx < questions.length) renderQuestion(); else finalize();
+  });
+  opt2.addEventListener('click', ()=>{
+    applyChoice(2);
+    if (++idx < questions.length) renderQuestion(); else finalize();
+  });
+
+  retryBtn.addEventListener('click', ()=>{ location.href = location.pathname; });
+  shareBtn.addEventListener('click', async ()=>{
+    await navigator.clipboard.writeText(location.href);
+    toast('링크 복사 완료!');
+  });
+
+  // ===== 공유 링크로 복원 =====
+  (function restoreFromQuery(){
+    const qs = new URLSearchParams(location.search);
+    const str = qs.get('picks');
+    if (!str) return;
+    const arr = str.split('').map(x=>parseInt(x,10)).filter(x=>x===1||x===2);
+    if (arr.length !== questions.length) return;
+    intro.classList.add('hidden');
+    quiz.classList.add('hidden');
+    arr.forEach((choice, i)=>{ idx=i; applyChoice(choice); });
+    finalize();
+  })();
+  </script>
+</body>
+</html>
+
