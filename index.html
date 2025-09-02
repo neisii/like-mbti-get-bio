@@ -8,392 +8,240 @@
   <style>
     body { font-family: system-ui, sans-serif; }
     .card { box-shadow: 0 10px 30px rgba(0,0,0,.08); }
-    .kbd { border:1px solid #e5e7eb; border-bottom-width:2px; padding:.15rem .4rem; border-radius:.4rem; font-weight:600; font-size:.8rem;}
+    input[type="radio"] { display: none; }
+    input[type="radio"] + label {
+      cursor: pointer; border: 1px solid #e5e7eb; background-color: #fff;
+      transition: background-color .2s, border-color .2s;
+    }
+    input[type="radio"]:checked + label {
+      background-color: #eef2ff; border-color: #4f46e5; font-weight: 600;
+    }
+    .fortune-cookie-box {
+      transition: transform .2s;
+    }
+    .fortune-cookie-box:hover {
+      transform: translateY(-5px);
+    }
   </style>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
   <main class="max-w-3xl mx-auto p-6">
-    <section id="intro" class="card bg-white rounded-2xl p-6">
-      <h1 class="text-2xl font-bold mb-2">MBTI 스타일 심리테스트 + GitHub Bio 생성기</h1>
-      <p class="text-sm text-gray-600 mb-4">10문항에 답하면 MBTI 스타일을 추정하고, 결과에 맞는 깃허브 Bio 문구를 10개 추천해줘.</p>
-      <button id="startBtn" class="px-5 py-3 rounded-xl bg-indigo-600 text-white">시작하기</button>
+    <section id="intro" class="card bg-white rounded-2xl p-6 text-center">
+      <h1 class="text-2xl font-bold mb-2">MBTI 스타일 GitHub Bio 생성기</h1>
+      <p class="text-sm text-gray-600 mb-4">12문항에 답하면 MBTI 스타일을 추정하고, 포춘쿠키를 깨서 나만의 Bio 문구를 확인해보세요!</p>
+      <button id="startBtn" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-bold">시작하기</button>
     </section>
 
     <section id="quiz" class="hidden mt-6 card bg-white rounded-2xl p-6">
       <div class="flex items-center justify-between mb-4">
-        <div id="progressLabel" class="text-sm text-gray-600">1 / 10</div>
-        <div class="w-40 h-2 bg-gray-100 rounded-full overflow-hidden"><div id="progressBar" class="h-full bg-indigo-600" style="width:10%"></div></div>
+        <div id="progressLabel" class="text-sm text-gray-600">1 / 12</div>
+        <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden"><div id="progressBar" class="h-full bg-indigo-600"></div></div>
       </div>
-      <h2 id="qText" class="text-xl font-bold mb-4">질문</h2>
-      <div class="grid gap-3">
-        <button id="opt1" class="px-5 py-4 rounded-xl border">1</button>
-        <button id="opt2" class="px-5 py-4 rounded-xl border">2</button>
-      </div>
+      <h2 id="qText" class="text-xl font-bold mb-4 text-center">질문</h2>
+      <div id="options" class="grid gap-3"></div>
+      <button id="nextBtn" class="mt-5 px-5 py-3 rounded-xl bg-indigo-600 text-white w-full disabled:bg-gray-300" disabled>다음</button>
     </section>
 
-    <section id="result" class="hidden mt-6 card bg-white rounded-2xl p-6">
-      <div id="mbtiBadge" class="text-lg font-bold mb-4"></div>
-      <div id="bioList" class="grid gap-3 mb-6"></div>
-      <details class="bg-gray-50 rounded-xl p-4">
-        <summary class="cursor-pointer font-semibold">README.md 스니펫 보기</summary>
-        <pre id="readmeSnippet" class="mt-3 overflow-x-auto text-sm p-3 rounded-lg bg-white border"></pre>
-      </details>
-      <div class="mt-6 flex flex-wrap gap-3">
+    <section id="result" class="hidden mt-6 card bg-white rounded-2xl p-6 text-center">
+      <h2 class="text-lg font-semibold text-gray-700 mb-2">당신의 MBTI 결과는...</h2>
+      <div id="mbtiTuner" class="flex justify-center items-center gap-2 mb-6"></div>
+      
+      <h2 class="text-lg font-semibold text-gray-700 mb-4">포춘쿠키를 깨서 Bio 문구를 확인하세요!</h2>
+      <div id="fortuneCookies" class="flex justify-around items-center mb-6"></div>
+      
+      <div id="revealedBios" class="grid gap-3 text-left"></div>
+
+      <div class="mt-8 flex flex-wrap gap-3 justify-center">
         <button id="retryBtn" class="px-4 py-2 rounded-lg border">다시 하기</button>
-        <button id="shareBtn" class="px-4 py-2 rounded-lg bg-indigo-600 text-white">결과 링크 복사</button>
       </div>
     </section>
   </main>
 
   <script>
+  // ===== SVG 아이콘 =====
+  const COOKIE_ICON = `<svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.5 13.5C21.5 19.575 16.575 21.5 12 21.5C7.425 21.5 2.5 19.575 2.5 13.5C2.5 7.425 7.425 2.5 12 2.5C16.575 2.5 21.5 7.425 21.5 13.5Z" stroke="#4A5568" stroke-width="1.5"/><path d="M12 2.5V21.5" stroke="#4A5568" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const CRACKED_COOKIE_ICON = `<svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.5 13.5C21.5 19.575 16.575 21.5 12 21.5C7.425 21.5 2.5 19.575 2.5 13.5C2.5 7.425 7.425 2.5 12 2.5C16.575 2.5 21.5 7.425 21.5 13.5Z" stroke="#4A5568" stroke-width="1.5"/><path d="M12 2.5L13.125 5.5M12 21.5L10.25 17.5" stroke="#4A5568" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 5.5L16.625 8.5M5.5 5.5L7.375 8.5" stroke="#4A5568" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
   // ===== 질문 세트 =====
   const questions = [
-    { t: '아침에 눈을 떴을 때, 먼저 하는 건?', a1: '핸드폰 확인', a2: '물 한잔 마시기', axis: 'P', dir: [ +1, -1 ] },
-    { t: '약속이 취소됐을 때, 너의 반응은?', a1: '휴… 살았다', a2: '아쉬워서 다른 약속을 잡음', axis: 'E', dir: [ -1, +1 ] },
-    { t: '카페에서 메뉴 고를 때', a1: '늘 마시던 걸 시킴', a2: '새로운 메뉴 도전', axis: 'N', dir: [ -1, +1 ] },
-    { t: '길 가다 모르는 사람이 길을 묻는다', a1: '간단히 방향만 알려줌', a2: '지도 열어 자세히 안내', axis: 'T', dir: [ +1, -1 ] },
-    { t: '하루를 돌아봤을 때 더 중요한 것은?', a1: '오늘 내가 한 일(성과)', a2: '오늘 내가 느낀 감정', axis: 'T', dir: [ +1, -1 ] },
-    { t: '여행 일정이 꼬였다', a1: '뭐 어때, 일단 즐기자!', a2: '계획을 다시 세운다', axis: 'P', dir: [ +1, -1 ] },
-    { t: '팀 프로젝트에서 나는 주로…', a1: '아이디어 뿌리는 사람', a2: '흐트러진 걸 정리하는 사람', axis: 'P', dir: [ +1, -1 ] },
-    { t: '집에 혼자 있을 때 나는…', a1: '음악/영상 틀고 뭔가 함', a2: '조용히 멍 때리거나 책', axis: 'E', dir: [ +1, -1 ] },
-    { t: '문제에 부딪히면 우선순위는?', a1: '빨리 해결책부터 찾는다', a2: '왜 생겼는지 원인 분석', axis: 'N', dir: [ -1, +1 ] },
-    { t: '더 끌리는 말은?', a1: '새로운 경험이 너를 성장시켜', a2: '꾸준함이 결국 너를 지켜줘', axis: 'P', dir: [ +1, -1 ] },
+    { t: '새로운 사람들과 어울리는 자리에 가면...', axis: 'E', opts: [ { text: '완전히 에너지를 얻고 즐겁다', score: 2 }, { text: '대체로 즐기는 편이다', score: 1 }, { text: '상황에 따라 다르다', score: 0 }, { text: '조금 기가 빨린다', score: -1 }, { text: '혼자 있고 싶어진다', score: -2 } ] },
+    { t: '주말을 보내는 더 선호하는 방식은?', axis: 'E', opts: [ { text: '친구들과 만나서 놀기', score: 2 }, { text: '가끔 약속 있는 외출', score: 1 }, { text: '그때그때 다름', score: 0 }, { text: '집에서 조용히 쉬기', score: -1 }, { text: '완벽한 집콕', score: -2 } ] },
+    { t: '대화할 때 나는 주로...', axis: 'E', opts: [ { text: '주도적으로 대화를 이끈다', score: 2 }, { text: '적극적으로 리액션한다', score: 1 }, { text: '상대방에 따라 다르다', score: 0 }, { text: '주로 듣는 편이다', score: -1 }, { text: '말없이 듣기만 할 때도 많다', score: -2 } ] },
+    { t: '새로운 기술이나 업무를 배울 때 더 선호하는 방식은?', axis: 'N', opts: [ { text: '전체적인 개념과 원리를 먼저 이해하는 것', score: 2 }, { text: '핵심 원리를 파악한 뒤 자유롭게 탐구하는 것', score: 1 }, { text: '상관 없음', score: 0 }, { text: '구체적인 예시를 보며 단계별로 따라하는 것', score: -1 }, { text: '실제 완성된 샘플을 직접 만져보며 익히는 것', score: -2 } ] },
+    { t: '더 흥미롭게 느껴지는 상상은?', axis: 'N', opts: [ { text: '\'만약 ~라면 어떨까?\' 식의 가상 시나리오를 펼치는 상상', score: 2 }, { text: '미래 기술이 세상을 어떻게 바꿀지 그려보는 상상', score: 1 }, { text: '둘 다 비슷함', score: 0 }, { text: '과거에 즐거웠던 경험을 다시 떠올리는 상상', score: -1 }, { text: '내가 가진 기술로 실제 문제를 멋지게 해결하는 상상', score: -2 } ] },
+    { t: '설명서를 읽을 때 나는...', axis: 'N', opts: [ { text: '대충 훑어보고 바로 시도한다', score: 2 }, { text: '필요한 부분만 빠르게 찾는다', score: 1 }, { text: '상황에 따라 다르다', score: 0 }, { text: '꼼꼼히 읽어보는 편이다', score: -1 }, { text: '처음부터 끝까지 정독한다', score: -2 } ] },
+    { t: '친구가 고민을 털어놓을 때 나는 주로...', axis: 'T', opts: [ { text: '문제의 원인을 분석하고 해결책을 제시한다', score: 2 }, { text: '논리적으로 상황을 파악하려고 노력한다', score: 1 }, { text: '먼저 들어보고 판단한다', score: 0 }, { text: '따뜻한 말로 위로하고 공감해준다', score: -1 }, { text: '친구의 감정을 헤아리는게 최우선이다', score: -2 } ] },
+    { t: '결정을 내릴 때 더 중요하게 생각하는 것은?', axis: 'T', opts: [ { text: '객관적인 사실과 데이터', score: 2 }, { text: '논리적인 타당성과 효율성', score: 1 }, { text: '상황에 따라 다름', score: 0 }, { text: '주변 사람들에게 미칠 영향', score: -1 }, { text: '나의 가치관과 마음의 소리', score: -2 } ] },
+    { t: '피드백을 주거나 받을 때 더 편한 방식은?', axis: 'T', opts: [ { text: '솔직하고 직설적인 피드백', score: 2 }, { text: '논리적 근거를 담은 피드백', score: 1 }, { text: '상황에 따라 다름', score: 0 }, { text: '칭찬을 섞은 부드러운 피드백', score: -1 }, { text: '상대방 기분을 고려한 완곡한 피드백', score: -2 } ] },
+    { t: '어떤 상태일 때 더 편안함과 안정감을 느끼나요?', axis: 'P', opts: [ { text: '선택지가 열려 있고 자유롭게 탐색할 수 있을 때', score: 2 }, { text: '상황에 따라 유연하게 대처할 수 있을 때', score: 1 }, { text: '상관 없음', score: 0 }, { text: '일의 순서와 과정이 명확하게 정리되어 있을 때', score: -1 }, { text: '미래가 예측 가능하고 계획대로 진행될 때', score: -2 } ] },
+    { t: '두 가지 방식 중, 당신의 일하는 방식과 더 가까운 것은?', axis: 'P', opts: [ { text: '일단 시작해서 진행하며, 과정에서 계획을 유연하게 바꾼다', score: 2 }, { text: '상황에 따라 다르지만, 유연하게 바꾸는 편에 가깝다', score: 1 }, { text: '두 방식의 중간 지점을 찾으려 한다', score: 0 }, { text: '시작 전, 목표와 계획을 명확히 하고 그 계획을 따르려 한다', score: -1 }, { text: '계획을 세우고, 그 계획을 실행하는 것에 집중하는 것이 훨씬 효율적이다', score: -2 } ] },
+    { t: '나의 책상이나 방 상태는?', axis: 'P', opts: [ { text: '창의적인 혼돈 상태', score: 2 }, { text: '나름의 규칙이 있는 어질러짐', score: 1 }, { text: '평범한 수준', score: 0 }, { text: '대체로 정돈되어 있음', score: -1 }, { text: '항상 깔끔하게 정리정돈', score: -2 } ] }
   ];
 
+  // ===== Bio 프리셋 =====
+  const bioPresets={"ENTP":[{"en":"Always chasing the next big idea.","kr":"늘 다음 큰 아이디어를 좇는다."},{"en":"Code is my playground.","kr":"코드는 나의 놀이터다."},{"en":"Curiosity is my fuel, shipping is my goal.","kr":"호기심이 연료, 배포가 목표."},{"en":"Chaos? I call it creativity.","kr":"혼돈? 난 그걸 창의성이라 부른다."},{"en":"Debugging with excitement, not frustration.","kr":"짜증 아닌 신남으로 디버깅한다."},{"en":"Rules are suggestions, not limits.","kr":"규칙은 제안일 뿐, 한계가 아니다."},{"en":"I break, I build, I repeat.","kr":"부수고, 만들고, 다시 반복한다."},{"en":"Restless mind, endless projects.","kr":"가만있지 못하는 마음, 끝없는 프로젝트."},{"en":"I don’t follow paths, I create them.","kr":"길을 따르지 않고, 길을 만든다."},{"en":"Fun is my debugging tool.","kr":"재미가 나의 디버깅 도구다."}],"ENTJ":[{"en":"Lead with vision, execute with discipline.","kr":"비전으로 이끌고 규율로 실행한다."},{"en":"Goals > excuses.","kr":"목표가 변명보다 크다."},{"en":"Strategy today, results tomorrow.","kr":"오늘은 전략, 내일은 결과."},{"en":"I turn plans into shipped code.","kr":"계획을 배포된 코드로 바꾼다."},{"en":"Ownership is my default.","kr":"오너십은 나의 기본값."},{"en":"Direct, decisive, delivered.","kr":"직설적, 결단적, 납품완료."},{"en":"Organize chaos into systems.","kr":"혼돈을 시스템으로 조직한다."},{"en":"Roadmaps, not roadblocks.","kr":"장애물이 아닌 로드맵을 만든다."},{"en":"Optimize teams, not just code.","kr":"코드만이 아니라 팀을 최적화한다."},{"en":"Winners ship.","kr":"승자는 배포한다."}],"ENFP":[{"en":"Energy is contagious, and I’m the source.","kr":"에너지는 전염된다, 나는 그 근원이다."},{"en":"I don’t just code, I spark joy.","kr":"나는 단순히 코딩하지 않고, 기쁨을 불러온다."},{"en":"Every bug is a story.","kr":"모든 버그는 하나의 이야기다."},{"en":"Collaboration over isolation.","kr":"고립보다 협업."},{"en":"I see possibilities, not obstacles.","kr":"나는 장애물이 아니라 가능성을 본다."},{"en":"Coffee + curiosity = endless creativity.","kr":"커피 + 호기심 = 무한한 창의성."},{"en":"Code is my way of connecting.","kr":"코드는 내가 연결되는 방식이다."},{"en":"Ideas never sleep.","kr":"아이디어는 결코 잠들지 않는다."},{"en":"I bring color into commits.","kr":"나는 커밋에 색을 불어넣는다."},{"en":"Optimism is my default branch.","kr":"낙관이 나의 기본 브랜치다."}],"ENFJ":[{"en":"Build people, then build products.","kr":"사람을 먼저 세우고, 제품을 만든다."},{"en":"Empathy that ships.","kr":"배포로 이어지는 공감."},{"en":"Align hearts and roadmaps.","kr":"마음과 로드맵을 정렬한다."},{"en":"Clear goals, kinder processes.","kr":"목표는 분명하게, 과정은 친절하게."},{"en":"I connect dots and people.","kr":"점과 사람을 연결한다."},{"en":"Feedback is a feature.","kr":"피드백은 하나의 기능이다."},{"en":"Culture is compounding interest.","kr":"문화는 복리처럼 쌓인다."},{"en":"Lead with listening.","kr":"경청으로 리드한다."},{"en":"Serve, coordinate, deliver.","kr":"섬기고, 조율하고, 납품한다."},{"en":"Collaboration is my compiler.","kr":"협업은 나의 컴파일러다."}],"ESTP":[{"en":"Try now, refine live.","kr":"지금 시도하고, 현장에서 다듬는다."},{"en":"Move fast, fix fast.","kr":"빠르게 움직이고, 빠르게 고친다."},{"en":"Ship or it didn’t happen.","kr":"배포 없으면 일어난 게 아니다."},{"en":"Hands-on beats hand-wavy.","kr":"말보다 손으로 증명한다."},{"en":"Latency kills—action heals.","kr":"지연은 해롭고, 행동은 치유한다."},{"en":"Prototype > powerpoint.","kr":"파워포인트보다 프로토타입."},{"en":"Risks calculated, buttons clicked.","kr":"위험은 계산하고, 버튼은 누른다."},{"en":"Break it to learn it.","kr":"부숴봐야 배운다."},{"en":"Field-tested code.","kr":"현장에서 검증한 코드."},{"en":"Sprint, then iterate.","kr":"스프린트하고, 반복한다."}],"ESTJ":[{"en":"Structure + execution = results.","kr":"구조 + 실행 = 결과."},{"en":"Standards enforce quality.","kr":"표준이 품질을 지킨다."},{"en":"Clear roles, clean releases.","kr":"역할은 명확하게, 릴리스는 깔끔하게."},{"en":"Checklists ship products.","kr":"체크리스트가 제품을 배포한다."},{"en":"SLA mindset in my code.","kr":"코드에도 SLA 마인드."},{"en":"Deadlines respected, scope protected.","kr":"마감은 존중하고, 범위는 보호한다."},{"en":"Process that scales.","kr":"스케일되는 프로세스."},{"en":"Budgets of time, not waste.","kr":"시간 예산은 있어도 낭비는 없다."},{"en":"Keep it consistent.","kr":"일관성을 지킨다."},{"en":"Pragmatic and predictable.","kr":"실용적이고 예측 가능하다."}],"ESFP":[{"en":"Make it useful and delightful.","kr":"유용하고 즐거운 걸 만든다."},{"en":"Pixels with personality.","kr":"개성이 담긴 픽셀."},{"en":"Demo-ready, everyday-ready.","kr":"데모도, 일상도 준비 완료."},{"en":"If it’s not fun, it won’t stick.","kr":"재미없으면 남지 않는다."},{"en":"Users first, party included.","kr":"사용자가 먼저, 즐거움은 기본."},{"en":"Shine in features, not slides.","kr":"슬라이드가 아니라 기능으로 빛난다."},{"en":"I turn ideas into experiences.","kr":"아이디어를 경험으로 바꾼다."},{"en":"Happy paths matter.","kr":"행복 경로가 중요하다."},{"en":"Music on, UI on.","kr":"음악 켜고, UI 켠다."},{"en":"Vibes meet usability.","kr":"바이브와 사용성이 만난다."}],"ESFJ":[{"en":"Ship together or don’t ship.","kr":"함께 배포하든지, 배포하지 않든지."},{"en":"I keep teams synced.","kr":"팀의 싱크를 맞춘다."},{"en":"Docs are acts of service.","kr":"문서는 서비스의 일환이다."},{"en":"On-call with care.","kr":"배려로 온콜한다."},{"en":"Make handoffs painless.","kr":"인수인계를 고통 없이."},{"en":"Reliability people can feel.","kr":"사람이 체감하는 신뢰성."},{"en":"Healthy rituals, healthy releases.","kr":"건강한 리추얼, 건강한 릴리스."},{"en":"Praise in public, fix in private.","kr":"공개적으로 칭찬, 비공개로 수정."},{"en":"I manage the glue work.","kr":"보이지 않는 연결 작업을 관리한다."},{"en":"Community over ego.","kr":"자아보다 공동체."}],"INTP":[{"en":"Logic is my playground.","kr":"논리가 나의 놀이터다."},{"en":"Curiosity debugs everything.","kr":"호기심이 모든 걸 디버그한다."},{"en":"I ask why until it compiles.","kr":"컴파일될 때까지 왜를 묻는다."},{"en":"Hypothesize, test, iterate.","kr":"가설·검증·반복."},{"en":"Clean abstractions, messy notebooks.","kr":"추상은 깔끔, 노트는 난장판."},{"en":"Premature optimization? Sometimes fun.","kr":"조기 최적화? 가끔은 재미다."},{"en":"I optimize ideas before code.","kr":"코드 전에 아이디어를 최적화한다."},{"en":"Edge cases are my cases.","kr":"엣지 케이스는 나의 케이스."},{"en":"Prove it with a REPL.","kr":"REPL로 증명한다."},{"en":"Thought experiments, real results.","kr":"사고 실험, 실제 결과."}],"INTJ":[{"en":"Systems over noise.","kr":"소음보다 시스템."},{"en":"Plans are temporary, vision is permanent.","kr":"계획은 임시, 비전은 영원."},{"en":"Quietly building the future.","kr":"조용히 미래를 설계한다."},{"en":"Architecture first, code second.","kr":"아키텍처가 먼저, 코드는 그 다음."},{"en":"I trust logic over luck.","kr":"나는 운보다 논리를 신뢰한다."},{"en":"Efficiency is elegance.","kr":"효율은 곧 우아함이다."},{"en":"Long-term thinker, short-term executor.","kr":"장기적 사고, 단기적 실행."},{"en":"Structure brings freedom.","kr":"구조가 자유를 만든다."},{"en":"Less talk, more architecture.","kr":"말보다 아키텍처."},{"en":"Strategy is my superpower.","kr":"전략이 나의 초능력이다."}],"INFP":[{"en":"Values guide my version control.","kr":"가치가 내 버전 관리를 이끈다."},{"en":"Meaning before metrics.","kr":"지표보다 의미가 먼저다."},{"en":"Code with conscience.","kr":"양심을 담아 코딩한다."},{"en":"Quiet conviction, steady commits.","kr":"조용한 확신, 꾸준한 커밋."},{"en":"Human-first features.","kr":"사람이 먼저인 기능."},{"en":"I care about impact.","kr":"나는 영향력을 신경 쓴다."},{"en":"Default to kindness, not silence.","kr":"침묵보다 친절이 기본."},{"en":"Purpose-driven pull requests.","kr":"목적 중심의 PR."},{"en":"Small acts, big effects.","kr":"작은 행동, 큰 효과."},{"en":"Authenticity scales.","kr":"진정성이 스케일한다."}],"INFJ":[{"en":"Systems with soul.","kr":"영혼 있는 시스템."},{"en":"Design for depth, not noise.","kr":"소음이 아닌 깊이를 설계한다."},{"en":"Quiet insight, precise action.","kr":"조용한 통찰, 정밀한 행동."},{"en":"Anticipate needs, reduce friction.","kr":"니즈를 예측하고 마찰을 줄인다."},{"en":"Align vision and values.","kr":"비전과 가치를 정렬한다."},{"en":"Long-term integrity over quick hacks.","kr":"빠른 핵보다 장기적 진정성."},{"en":"Gentle interfaces, strong backends.","kr":"부드러운 인터페이스, 강한 백엔드."},{"en":"Make complexity humane.","kr":"복잡함을 인간적으로 만든다."},{"en":"Empathy as architecture.","kr":"공감으로 아키텍처를 세운다."},{"en":"Thoughtful by default.","kr":"기본값은 사려 깊음."}],"ISTP":[{"en":"If it moves, I’ll tune it.","kr":"움직이면 튜닝한다."},{"en":"Measure twice, refactor once.","kr":"두 번 재고 한 번 리팩터."},{"en":"Tools over talk.","kr":"말보다 도구."},{"en":"Minimal UI, maximal control.","kr":"미니멀 UI, 맥시멀 제어."},{"en":"I fix it at the source.","kr":"근원에서 고친다."},{"en":"Benchmarks beat opinions.","kr":"벤치마크가 의견을 이긴다."},{"en":"I read the manual… and rewrite it.","kr":"매뉴얼을 읽고… 다시 쓴다."},{"en":"Silence, solder, success.","kr":"침묵, 납땜, 성공."},{"en":"Low-level, high impact.","kr":"로우레벨, 하이 임팩트."},{"en":"Ship small, optimize hard.","kr":"작게 배포, 강하게 최적화."}],"ISTJ":[{"en":"Reliability over hype.","kr":"과장보다 신뢰."},{"en":"Code that lasts, not trends that fade.","kr":"사라질 트렌드가 아닌, 오래가는 코드."},{"en":"Quietly consistent, consistently reliable.","kr":"조용히 꾸준하고, 꾸준히 신뢰받는다."},{"en":"Discipline beats chaos.","kr":"규율이 혼돈을 이긴다."},{"en":"My commits speak louder than my words.","kr":"내 말보다 커밋이 크게 말한다."},{"en":"Stability is innovation’s foundation.","kr":"안정이 혁신의 토대다."},{"en":"Details matter.","kr":"디테일이 중요하다."},{"en":"Plans protect productivity.","kr":"계획이 생산성을 지킨다."},{"en":"I fix before it breaks.","kr":"부서지기 전에 고친다."},{"en":"Trust is my coding standard.","kr":"신뢰가 나의 코딩 표준이다."}],"ISFP":[{"en":"Quiet craft, bold results.","kr":"조용한 공예, 대담한 결과."},{"en":"Details you can feel.","kr":"손끝으로 느껴지는 디테일."},{"en":"Aesthetic meets ergonomics.","kr":"미학과 사용성이 만난다."},{"en":"I design by listening.","kr":"귀로 듣고 디자인한다."},{"en":"Minimal, meaningful, maintainable.","kr":"미니멀, 의미, 유지보수."},{"en":"Smooth edges, sharp performance.","kr":"부드러운 모서리, 날카로운 성능."},{"en":"Harmony in components.","kr":"컴포넌트의 조화."},{"en":"Gentle UX, strong intent.","kr":"부드러운 UX, 강한 의도."},{"en":"Function with feeling.","kr":"감각을 담은 기능."},{"en":"Calm code, clear value.","kr":"차분한 코드, 분명한 가치."}],"ISFJ":[{"en":"Safeguard data, support people.","kr":"데이터를 지키고, 사람을 돕는다."},{"en":"I patch before panic.","kr":"당황하기 전에 패치한다."},{"en":"Quietly preventing outages.","kr":"조용히 장애를 예방한다."},{"en":"Service with stability.","kr":"안정으로 제공하는 서비스."},{"en":"Backups are love letters to tomorrow.","kr":"백업은 내일을 위한 연서."},{"en":"Respect the legacy, improve the present.","kr":"레거시를 존중하고 현재를 개선한다."},{"en":"Documentation as care.","kr":"배려로서의 문서화."},{"en":"Guardrails, not gates.","kr":"문턱이 아닌 가드레일."},{"en":"Consistency comforts users.","kr":"일관성이 사용자에게 안심을 준다."},{"en":"Reliability you can trust.","kr":"믿을 수 있는 신뢰성."}],"(add your custom line)":["(문구를 추가하세요)"]};(function fillMissing(){const all=['ENTP','ENTJ','ENFP','ENFJ','ESTP','ESTJ','ESFP','ESFJ','INTP','INTJ','INFP','INFJ','ISTP','ISTJ','ISFP','ISFJ'];const p={en:'(add your custom line)',kr:'(문구를 추가하세요)'};all.forEach(k=>{if(!bioPresets[k])bioPresets[k]=[...Array(10)].map(()=>p);});})();
+
   // ===== 상태 & 엘리먼트 =====
-  let idx=0; const scores={E:0,N:0,T:0,P:0};
+  let idx=0; let scores={E:0,N:0,T:0,P:0};
+  let currentType = '';
+  let randomBios = [];
+
   const $ = s=>document.querySelector(s);
-  const qText=$('#qText');
-  const opt1=$('#opt1');
-  const opt2=$('#opt2');
-  const mbtiBadge=$('#mbtiBadge');
-  const bioList=$('#bioList');
-  const quiz=$('#quiz');
   const intro=$('#intro');
+  const quiz=$('#quiz');
   const result=$('#result');
   const startBtn=$('#startBtn');
+  const retryBtn=$('#retryBtn');
+  
+  // 퀴즈 관련 엘리먼트
+  const qText=$('#qText');
+  const options=$('#options');
+  const nextBtn=$('#nextBtn');
   const progressLabel=$('#progressLabel');
   const progressBar=$('#progressBar');
-  const readmeSnippet=$('#readmeSnippet');
-  const retryBtn=$('#retryBtn');
-  const shareBtn=$('#shareBtn');
 
-  function updateProgress(){
-    progressLabel.textContent = `${idx + 1} / ${questions.length}`;
-    progressBar.style.width = `${((idx+1)/questions.length)*100}%`;
+  // 결과 관련 엘리먼트
+  const mbtiTuner=$('#mbtiTuner');
+  const fortuneCookies=$('#fortuneCookies');
+  const revealedBios=$('#revealedBios');
+
+  // ===== 퀴즈 진행 로직 =====
+  function resetQuizState() {
+    idx = 0;
+    scores = {E:0,N:0,T:0,P:0};
   }
+
   function renderQuestion(){
     const q=questions[idx];
     qText.textContent=q.t;
-    opt1.textContent='1) '+q.a1;
-    opt2.textContent='2) '+q.a2;
-    updateProgress();
+    options.innerHTML = '';
+    q.opts.forEach((opt, i) => {
+      const optId = `opt${i}`;
+      options.innerHTML += `
+        <div>
+          <input type="radio" name="option" id="${optId}" value="${opt.score}">
+          <label for="${optId}" class="block p-4 rounded-xl text-center">${opt.text}</label>
+        </div>
+      `;
+    });
+    nextBtn.disabled = true;
+    const progress = ((idx + 1)/questions.length)*100;
+    progressLabel.textContent = `${idx + 1} / ${questions.length}`;
+    progressBar.style.width = `${progress}%`;
   }
-  function applyChoice(choice){
+
+  function handleNextQuestion(){
+    const selected = options.querySelector('input[name="option"]:checked');
+    if (!selected) return;
+
     const q=questions[idx];
-    scores[q.axis]+=q.dir[choice-1];
-  }
-  function finalize(){
-    const type=`${scores.E>=0?'E':'I'}${scores.N>=0?'N':'S'}${scores.T>=0?'T':'F'}${scores.P>=0?'P':'J'}`;
-    mbtiBadge.textContent=type;
-    renderPresetBios(type);
-    readmeSnippet.textContent = makeReadmeSnippet(type);
-    intro.classList.add('hidden'); quiz.classList.add('hidden'); result.classList.remove('hidden');
-    const params=new URLSearchParams({picks:'done',type});
-    history.replaceState({},'',location.pathname+'?'+params.toString());
+    scores[q.axis] += parseInt(selected.value);
+    
+    if(++idx < questions.length) {
+      renderQuestion();
+    } else {
+      const initialType = `${scores.E>=0?'E':'I'}${scores.N>=0?'N':'S'}${scores.T>=0?'T':'F'}${scores.P>=0?'P':'J'}`;
+      finalize(initialType);
+    }
   }
 
-  startBtn.addEventListener('click',()=>{intro.classList.add('hidden'); quiz.classList.remove('hidden'); idx=0; renderQuestion();});
-  opt1.addEventListener('click',()=>{applyChoice(1); if(++idx<questions.length)renderQuestion(); else finalize();});
-  opt2.addEventListener('click',()=>{applyChoice(2); if(++idx<questions.length)renderQuestion(); else finalize();});
-  retryBtn.addEventListener('click',()=>{location.href=location.pathname;});
-  shareBtn.addEventListener('click',async()=>{await navigator.clipboard.writeText(location.href); toast('링크 복사 완료!');});
+  // ===== 결과 페이지 로직 =====
+  function finalize(type) {
+    quiz.classList.add('hidden');
+    result.classList.remove('hidden');
+    renderResultPage(type);
+  }
 
-  // ===== Bio 프리셋 (16유형 × 10개) =====
-  const bioPresets={
-    ENTP: [
-      { en: "Always chasing the next big idea.", kr: "늘 다음 큰 아이디어를 좇는다." },
-      { en: "Code is my playground.", kr: "코드는 나의 놀이터다." },
-      { en: "Curiosity is my fuel, shipping is my goal.", kr: "호기심이 연료, 배포가 목표." },
-      { en: "Chaos? I call it creativity.", kr: "혼돈? 난 그걸 창의성이라 부른다." },
-      { en: "Debugging with excitement, not frustration.", kr: "짜증 아닌 신남으로 디버깅한다." },
-      { en: "Rules are suggestions, not limits.", kr: "규칙은 제안일 뿐, 한계가 아니다." },
-      { en: "I break, I build, I repeat.", kr: "부수고, 만들고, 다시 반복한다." },
-      { en: "Restless mind, endless projects.", kr: "가만있지 못하는 마음, 끝없는 프로젝트." },
-      { en: "I don’t follow paths, I create them.", kr: "길을 따르지 않고, 길을 만든다." },
-      { en: "Fun is my debugging tool.", kr: "재미가 나의 디버깅 도구다." },
-    ],
-    ENTJ: [
-      { en: "Lead with vision, execute with discipline.", kr: "비전으로 이끌고 규율로 실행한다." },
-      { en: "Goals > excuses.", kr: "목표가 변명보다 크다." },
-      { en: "Strategy today, results tomorrow.", kr: "오늘은 전략, 내일은 결과." },
-      { en: "I turn plans into shipped code.", kr: "계획을 배포된 코드로 바꾼다." },
-      { en: "Ownership is my default.", kr: "오너십은 나의 기본값." },
-      { en: "Direct, decisive, delivered.", kr: "직설적, 결단적, 납품완료." },
-      { en: "Organize chaos into systems.", kr: "혼돈을 시스템으로 조직한다." },
-      { en: "Roadmaps, not roadblocks.", kr: "장애물이 아닌 로드맵을 만든다." },
-      { en: "Optimize teams, not just code.", kr: "코드만이 아니라 팀을 최적화한다." },
-      { en: "Winners ship.", kr: "승자는 배포한다." },
-    ],
-    ENFP: [
-      { en: "Energy is contagious, and I’m the source.", kr: "에너지는 전염된다, 나는 그 근원이다." },
-      { en: "I don’t just code, I spark joy.", kr: "나는 단순히 코딩하지 않고, 기쁨을 불러온다." },
-      { en: "Every bug is a story.", kr: "모든 버그는 하나의 이야기다." },
-      { en: "Collaboration over isolation.", kr: "고립보다 협업." },
-      { en: "I see possibilities, not obstacles.", kr: "나는 장애물이 아니라 가능성을 본다." },
-      { en: "Coffee + curiosity = endless creativity.", kr: "커피 + 호기심 = 무한한 창의성." },
-      { en: "Code is my way of connecting.", kr: "코드는 내가 연결되는 방식이다." },
-      { en: "Ideas never sleep.", kr: "아이디어는 결코 잠들지 않는다." },
-      { en: "I bring color into commits.", kr: "나는 커밋에 색을 불어넣는다." },
-      { en: "Optimism is my default branch.", kr: "낙관이 나의 기본 브랜치다." },
-    ],
-    ENFJ: [
-      { en: "Build people, then build products.", kr: "사람을 먼저 세우고, 제품을 만든다." },
-      { en: "Empathy that ships.", kr: "배포로 이어지는 공감." },
-      { en: "Align hearts and roadmaps.", kr: "마음과 로드맵을 정렬한다." },
-      { en: "Clear goals, kinder processes.", kr: "목표는 분명하게, 과정은 친절하게." },
-      { en: "I connect dots and people.", kr: "점과 사람을 연결한다." },
-      { en: "Feedback is a feature.", kr: "피드백은 하나의 기능이다." },
-      { en: "Culture is compounding interest.", kr: "문화는 복리처럼 쌓인다." },
-      { en: "Lead with listening.", kr: "경청으로 리드한다." },
-      { en: "Serve, coordinate, deliver.", kr: "섬기고, 조율하고, 납품한다." },
-      { en: "Collaboration is my compiler.", kr: "협업은 나의 컴파일러다." },
-    ],
-    ESTP: [
-      { en: "Try now, refine live.", kr: "지금 시도하고, 현장에서 다듬는다." },
-      { en: "Move fast, fix fast.", kr: "빠르게 움직이고, 빠르게 고친다." },
-      { en: "Ship or it didn’t happen.", kr: "배포 없으면 일어난 게 아니다." },
-      { en: "Hands-on beats hand-wavy.", kr: "말보다 손으로 증명한다." },
-      { en: "Latency kills—action heals.", kr: "지연은 해롭고, 행동은 치유한다." },
-      { en: "Prototype > powerpoint.", kr: "파워포인트보다 프로토타입." },
-      { en: "Risks calculated, buttons clicked.", kr: "위험은 계산하고, 버튼은 누른다." },
-      { en: "Break it to learn it.", kr: "부숴봐야 배운다." },
-      { en: "Field-tested code.", kr: "현장에서 검증한 코드." },
-      { en: "Sprint, then iterate.", kr: "스프린트하고, 반복한다." },
-    ],
-    ESTJ: [
-      { en: "Structure + execution = results.", kr: "구조 + 실행 = 결과." },
-      { en: "Standards enforce quality.", kr: "표준이 품질을 지킨다." },
-      { en: "Clear roles, clean releases.", kr: "역할은 명확하게, 릴리스는 깔끔하게." },
-      { en: "Checklists ship products.", kr: "체크리스트가 제품을 배포한다." },
-      { en: "SLA mindset in my code.", kr: "코드에도 SLA 마인드." },
-      { en: "Deadlines respected, scope protected.", kr: "마감은 존중하고, 범위는 보호한다." },
-      { en: "Process that scales.", kr: "스케일되는 프로세스." },
-      { en: "Budgets of time, not waste.", kr: "시간 예산은 있어도 낭비는 없다." },
-      { en: "Keep it consistent.", kr: "일관성을 지킨다." },
-      { en: "Pragmatic and predictable.", kr: "실용적이고 예측 가능하다." },
-    ],
-    ESFP: [
-      { en: "Make it useful and delightful.", kr: "유용하고 즐거운 걸 만든다." },
-      { en: "Pixels with personality.", kr: "개성이 담긴 픽셀." },
-      { en: "Demo-ready, everyday-ready.", kr: "데모도, 일상도 준비 완료." },
-      { en: "If it’s not fun, it won’t stick.", kr: "재미없으면 남지 않는다." },
-      { en: "Users first, party included.", kr: "사용자가 먼저, 즐거움은 기본." },
-      { en: "Shine in features, not slides.", kr: "슬라이드가 아니라 기능으로 빛난다." },
-      { en: "I turn ideas into experiences.", kr: "아이디어를 경험으로 바꾼다." },
-      { en: "Happy paths matter.", kr: "행복 경로가 중요하다." },
-      { en: "Music on, UI on.", kr: "음악 켜고, UI 켠다." },
-      { en: "Vibes meet usability.", kr: "바이브와 사용성이 만난다." },
-    ],
-    ESFJ: [
-      { en: "Ship together or don’t ship.", kr: "함께 배포하든지, 배포하지 않든지." },
-      { en: "I keep teams synced.", kr: "팀의 싱크를 맞춘다." },
-      { en: "Docs are acts of service.", kr: "문서는 서비스의 일환이다." },
-      { en: "On-call with care.", kr: "배려로 온콜한다." },
-      { en: "Make handoffs painless.", kr: "인수인계를 고통 없이." },
-      { en: "Reliability people can feel.", kr: "사람이 체감하는 신뢰성." },
-      { en: "Healthy rituals, healthy releases.", kr: "건강한 리추얼, 건강한 릴리스." },
-      { en: "Praise in public, fix in private.", kr: "공개적으로 칭찬, 비공개로 수정." },
-      { en: "I manage the glue work.", kr: "보이지 않는 연결 작업을 관리한다." },
-      { en: "Community over ego.", kr: "자아보다 공동체." },
-    ],
-    INTP:[
-      {en:"Logic is my playground.",kr:"논리가 나의 놀이터다."},
-      {en:"Curiosity debugs everything.",kr:"호기심이 모든 걸 디버그한다."},
-      {en:"I ask why until it compiles.",kr:"컴파일될 때까지 왜를 묻는다."},
-      {en:"Hypothesize, test, iterate.",kr:"가설·검증·반복."},
-      {en:"Clean abstractions, messy notebooks.",kr:"추상은 깔끔, 노트는 난장판."},
-      {en:"Premature optimization? Sometimes fun.",kr:"조기 최적화? 가끔은 재미다."},
-      {en:"I optimize ideas before code.",kr:"코드 전에 아이디어를 최적화한다."},
-      {en:"Edge cases are my cases.",kr:"엣지 케이스는 나의 케이스."},
-      {en:"Prove it with a REPL.",kr:"REPL로 증명한다."},
-      {en:"Thought experiments, real results.",kr:"사고 실험, 실제 결과."},
-    ],
-    INTJ:[
-      {en:"Systems over noise.",kr:"소음보다 시스템."},
-      {en:"Plans are temporary, vision is permanent.",kr:"계획은 임시, 비전은 영원."},
-      {en:"Quietly building the future.",kr:"조용히 미래를 설계한다."},
-      {en:"Architecture first, code second.",kr:"아키텍처가 먼저, 코드는 그 다음."},
-      {en:"I trust logic over luck.",kr:"나는 운보다 논리를 신뢰한다."},
-      {en:"Efficiency is elegance.",kr:"효율은 곧 우아함이다."},
-      {en:"Long-term thinker, short-term executor.",kr:"장기적 사고, 단기적 실행."},
-      {en:"Structure brings freedom.",kr:"구조가 자유를 만든다."},
-      {en:"Less talk, more architecture.",kr:"말보다 아키텍처."},
-      {en:"Strategy is my superpower.",kr:"전략이 나의 초능력이다."},
-    ],
-    INFP:[
-      {en:"Values guide my version control.",kr:"가치가 내 버전 관리를 이끈다."},
-      {en:"Meaning before metrics.",kr:"지표보다 의미가 먼저다."},
-      {en:"Code with conscience.",kr:"양심을 담아 코딩한다."},
-      {en:"Quiet conviction, steady commits.",kr:"조용한 확신, 꾸준한 커밋."},
-      {en:"Human-first features.",kr:"사람이 먼저인 기능."},
-      {en:"I care about impact.",kr:"나는 영향력을 신경 쓴다."},
-      {en:"Default to kindness, not silence.",kr:"침묵보다 친절이 기본."},
-      {en:"Purpose-driven pull requests.",kr:"목적 중심의 PR."},
-      {en:"Small acts, big effects.",kr:"작은 행동, 큰 효과."},
-      {en:"Authenticity scales.",kr:"진정성이 스케일한다."},
-    ],
-    INFJ:[
-      {en:"Systems with soul.",kr:"영혼 있는 시스템."},
-      {en:"Design for depth, not noise.",kr:"소음이 아닌 깊이를 설계한다."},
-      {en:"Quiet insight, precise action.",kr:"조용한 통찰, 정밀한 행동."},
-      {en:"Anticipate needs, reduce friction.",kr:"니즈를 예측하고 마찰을 줄인다."},
-      {en:"Align vision and values.",kr:"비전과 가치를 정렬한다."},
-      {en:"Long-term integrity over quick hacks.",kr:"빠른 핵보다 장기적 진정성."},
-      {en:"Gentle interfaces, strong backends.",kr:"부드러운 인터페이스, 강한 백엔드."},
-      {en:"Make complexity humane.",kr:"복잡함을 인간적으로 만든다."},
-      {en:"Empathy as architecture.",kr:"공감으로 아키텍처를 세운다."},
-      {en:"Thoughtful by default.",kr:"기본값은 사려 깊음."},
-    ],
-    ISTP:[
-      {en:"If it moves, I’ll tune it.",kr:"움직이면 튜닝한다."},
-      {en:"Measure twice, refactor once.",kr:"두 번 재고 한 번 리팩터."},
-      {en:"Tools over talk.",kr:"말보다 도구."},
-      {en:"Minimal UI, maximal control.",kr:"미니멀 UI, 맥시멀 제어."},
-      {en:"I fix it at the source.",kr:"근원에서 고친다."},
-      {en:"Benchmarks beat opinions.",kr:"벤치마크가 의견을 이긴다."},
-      {en:"I read the manual… and rewrite it.",kr:"매뉴얼을 읽고… 다시 쓴다."},
-      {en:"Silence, solder, success.",kr:"침묵, 납땜, 성공."},
-      {en:"Low-level, high impact.",kr:"로우레벨, 하이 임팩트."},
-      {en:"Ship small, optimize hard.",kr:"작게 배포, 강하게 최적화."},
-    ],
-    ISTJ:[
-      {en:"Reliability over hype.",kr:"과장보다 신뢰."},
-      {en:"Code that lasts, not trends that fade.",kr:"사라질 트렌드가 아닌, 오래가는 코드."},
-      {en:"Quietly consistent, consistently reliable.",kr:"조용히 꾸준하고, 꾸준히 신뢰받는다."},
-      {en:"Discipline beats chaos.",kr:"규율이 혼돈을 이긴다."},
-      {en:"My commits speak louder than my words.",kr:"내 말보다 커밋이 크게 말한다."},
-      {en:"Stability is innovation’s foundation.",kr:"안정이 혁신의 토대다."},
-      {en:"Details matter.",kr:"디테일이 중요하다."},
-      {en:"Plans protect productivity.",kr:"계획이 생산성을 지킨다."},
-      {en:"I fix before it breaks.",kr:"부서지기 전에 고친다."},
-      {en:"Trust is my coding standard.",kr:"신뢰가 나의 코딩 표준이다."},
-    ],
-    ISFP:[
-      {en:"Quiet craft, bold results.",kr:"조용한 공예, 대담한 결과."},
-      {en:"Details you can feel.",kr:"손끝으로 느껴지는 디테일."},
-      {en:"Aesthetic meets ergonomics.",kr:"미학과 사용성이 만난다."},
-      {en:"I design by listening.",kr:"귀로 듣고 디자인한다."},
-      {en:"Minimal, meaningful, maintainable.",kr:"미니멀, 의미, 유지보수."},
-      {en:"Smooth edges, sharp performance.",kr:"부드러운 모서리, 날카로운 성능."},
-      {en:"Harmony in components.",kr:"컴포넌트의 조화."},
-      {en:"Gentle UX, strong intent.",kr:"부드러운 UX, 강한 의도."},
-      {en:"Function with feeling.",kr:"감각을 담은 기능."},
-      {en:"Calm code, clear value.",kr:"차분한 코드, 분명한 가치."},
-    ],
-    ISFJ:[
-      {en:"Safeguard data, support people.",kr:"데이터를 지키고, 사람을 돕는다."},
-      {en:"I patch before panic.",kr:"당황하기 전에 패치한다."},
-      {en:"Quietly preventing outages.",kr:"조용히 장애를 예방한다."},
-      {en:"Service with stability.",kr:"안정으로 제공하는 서비스."},
-      {en:"Backups are love letters to tomorrow.",kr:"백업은 내일을 위한 연서."},
-      {en:"Respect the legacy, improve the present.",kr:"레거시를 존중하고 현재를 개선한다."},
-      {en:"Documentation as care.",kr:"배려로서의 문서화."},
-      {en:"Guardrails, not gates.",kr:"문턱이 아닌 가드레일."},
-      {en:"Consistency comforts users.",kr:"일관성이 사용자에게 안심을 준다."},
-      {en:"Reliability you can trust.",kr:"믿을 수 있는 신뢰성."},
-    ],
-    ESFP:[
-      {en:"Make it useful and delightful.",kr:"유용하고 즐거운 걸 만든다."},
-      {en:"Pixels with personality.",kr:"개성이 담긴 픽셀."},
-      {en:"Demo-ready, everyday-ready.",kr:"데모도, 일상도 준비 완료."},
-      {en:"If it’s not fun, it won’t stick.",kr:"재미없으면 남지 않는다."},
-      {en:"Users first, party included.",kr:"사용자가 먼저, 즐거움은 기본."},
-      {en:"Shine in features, not slides.",kr:"슬라이드가 아니라 기능으로 빛난다."},
-      {en:"I turn ideas into experiences.",kr:"아이디어를 경험으로 바꾼다."},
-      {en:"Happy paths matter.",kr:"행복 경로가 중요하다."},
-      {en:"Music on, UI on.",kr:"음악 켜고, UI 켠다."},
-      {en:"Vibes meet usability.",kr:"바이브와 사용성이 만난다."},
-    ],
-    ESFJ:[
-      {en:"Ship together or don’t ship.",kr:"함께 배포하든지, 배포하지 않든지."},
-      {en:"I keep teams synced.",kr:"팀의 싱크를 맞춘다."},
-      {en:"Docs are acts of service.",kr:"문서는 서비스의 일환이다."},
-      {en:"On-call with care.",kr:"배려로 온콜한다."},
-      {en:"Make handoffs painless.",kr:"인수인계를 고통 없이."},
-      {en:"Reliability people can feel.",kr:"사람이 체감하는 신뢰성."},
-      {en:"Healthy rituals, healthy releases.",kr:"건강한 리추얼, 건강한 릴리스."},
-      {en:"Praise in public, fix in private.",kr:"공개적으로 칭찬, 비공개로 수정."},
-      {en:"I manage the glue work.",kr:"보이지 않는 연결 작업을 관리한다."},
-      {en:"Community over ego.",kr:"자아보다 공동체."},
-    ],
-    ESTP:[
-      {en:"Try now, refine live.",kr:"지금 시도하고, 현장에서 다듬는다."},
-      {en:"Move fast, fix fast.",kr:"빠르게 움직이고, 빠르게 고친다."},
-      {en:"Ship or it didn’t happen.",kr:"배포 없으면 일어난 게 아니다."},
-      {en:"Hands-on beats hand-wavy.",kr:"말보다 손으로 증명한다."},
-      {en:"Latency kills—action heals.",kr:"지연은 해롭고, 행동은 치유한다."},
-      {en:"Prototype > powerpoint.",kr:"파워포인트보다 프로토타입."},
-      {en:"Risks calculated, buttons clicked.",kr:"위험은 계산하고, 버튼은 누른다."},
-      {en:"Break it to learn it.",kr:"부숴봐야 배운다."},
-      {en:"Field-tested code.",kr:"현장에서 검증한 코드."},
-      {en:"Sprint, then iterate.",kr:"스프린트하고, 반복한다."},
-    ],
-    ESTJ:[
-      {en:"Structure + execution = results.",kr:"구조 + 실행 = 결과."},
-      {en:"Standards enforce quality.",kr:"표준이 품질을 지킨다."},
-      {en:"Clear roles, clean releases.",kr:"역할은 명확하게, 릴리스는 깔끔하게."},
-      {en:"Checklists ship products.",kr:"체크리스트가 제품을 배포한다."},
-      {en:"SLA mindset in my code.",kr:"코드에도 SLA 마인드."},
-      {en:"Deadlines respected, scope protected.",kr:"마감은 존중하고, 범위는 보호한다."},
-      {en:"Process that scales.",kr:"스케일되는 프로세스."},
-      {en:"Budgets of time, not waste.",kr:"시간 예산은 있어도 낭비는 없다."},
-      {en:"Keep it consistent.",kr:"일관성을 지킨다."},
-      {en:"Pragmatic and predictable.",kr:"실용적이고 예측 가능하다."},
-    ],
-  };
-
-  // 보정: 누락된 키가 없도록 16유형 완성
-  (function fillMissing(){
-    const all=['ENTP','ENTJ','ENFP','ENFJ','ESTP','ESTJ','ESFP','ESFJ','INTP','INTJ','INFP','INFJ','ISTP','ISTJ','ISFP','ISFJ'];
-    const placeholders={en:'(add your custom line)',kr:'(문구를 추가하세요)'};
-    all.forEach(k=>{ if(!bioPresets[k]) bioPresets[k]=[...Array(10)].map(()=>placeholders); });
-  })();
-
-  function renderPresetBios(type){
-    bioList.innerHTML='';
-    const list=bioPresets[type]||[];
-    list.forEach((b,i)=>{
-      const box=document.createElement('div');
-      box.className='p-4 border rounded-xl bg-gray-50';
-      box.innerHTML=`<div class='text-sm text-gray-500 mb-1'>Preset #${i+1}</div>
-        <button class='copyBtn text-left hover:bg-white p-2 rounded w-full' data-text="${escapeHtml(b.en)}">🇺🇸 ${escapeHtml(b.en)}</button>
-        <button class='copyBtn text-left hover:bg-white p-2 rounded w-full' data-text="${escapeHtml(b.kr)}">🇰🇷 ${escapeHtml(b.kr)}</button>`;
-      bioList.appendChild(box);
+  function renderResultPage(type) {
+    currentType = type;
+    
+    // 1. MBTI 튜너 렌더링
+    mbtiTuner.innerHTML = '';
+    const axes = [{l:'E', r:'I'}, {l:'N', r:'S'}, {l:'T', r:'F'}, {l:'P', r:'J'}];
+    type.split('').forEach((char, i) => {
+      const axis = axes[i];
+      const btn = document.createElement('button');
+      btn.className = 'text-2xl font-bold px-4 py-2 rounded-lg bg-indigo-100 text-indigo-700';
+      btn.textContent = char;
+      btn.onclick = () => handleToggle(i);
+      mbtiTuner.appendChild(btn);
     });
-    bioList.querySelectorAll('.copyBtn').forEach(btn=>{
-      btn.addEventListener('click',async(e)=>{
-        const text=e.currentTarget.getAttribute('data-text');
-        await navigator.clipboard.writeText(unescapeHtml(text));
-        toast('복사 완료!');
+
+    // 2. Bio 랜덤 선택 및 포춘쿠키 렌더링
+    randomBios = (bioPresets[type] || []).sort(() => 0.5 - Math.random()).slice(0, 3);
+    fortuneCookies.innerHTML = '';
+    revealedBios.innerHTML = '';
+    for (let i=0; i<3; i++) {
+      const cookieDiv = document.createElement('div');
+      cookieDiv.className = 'fortune-cookie-box cursor-pointer';
+      cookieDiv.innerHTML = COOKIE_ICON;
+      cookieDiv.dataset.index = i;
+      cookieDiv.dataset.revealed = 'false';
+      cookieDiv.onclick = () => handleCookieClick(cookieDiv);
+      fortuneCookies.appendChild(cookieDiv);
+    }
+  }
+
+  function handleToggle(index) {
+    const axes = [{E:'I', I:'E'}, {N:'S', S:'N'}, {T:'F', F:'T'}, {P:'J', J:'P'}];
+    let typeArray = currentType.split('');
+    typeArray[index] = axes[index][typeArray[index]];
+    const newType = typeArray.join('');
+    renderResultPage(newType);
+  }
+
+  function handleCookieClick(cookieDiv) {
+    if (cookieDiv.dataset.revealed === 'true') return;
+
+    cookieDiv.dataset.revealed = 'true';
+    cookieDiv.innerHTML = CRACKED_COOKIE_ICON;
+    
+    const index = parseInt(cookieDiv.dataset.index);
+    const bio = randomBios[index];
+
+    if (bio) {
+      const bioEl = document.createElement('div');
+      bioEl.className = 'p-4 border rounded-xl bg-gray-100 opacity-0 transition-opacity duration-500';
+      bioEl.innerHTML = `<button class='copyBtn text-left w-full' data-text="${escapeHtml(bio.en)}">🇺🇸 ${escapeHtml(bio.en)}</button>\n                         <button class='copyBtn text-left w-full mt-1' data-text="${escapeHtml(bio.kr)}">🇰🇷 ${escapeHtml(bio.kr)}</button>`;
+      revealedBios.appendChild(bioEl);
+      setTimeout(() => bioEl.style.opacity = 1, 100);
+
+      bioEl.querySelectorAll('.copyBtn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const text = e.currentTarget.getAttribute('data-text');
+          await navigator.clipboard.writeText(unescapeHtml(text));
+          toast('복사 완료!');
+        });
       });
-    });
+    }
   }
 
-  function makeReadmeSnippet(type){
-    return `## 👋 Hi, I'm ${type} flavored\n\n⚡ **Energy = Productivity**\n\n🎉 **Excitement = Identity**\n`;
-  }
+  // ===== 이벤트 리스너 =====
+  startBtn.addEventListener('click',()=>{ 
+    resetQuizState();
+    intro.classList.add('hidden');
+    quiz.classList.remove('hidden');
+    renderQuestion();
+  });
 
+  options.addEventListener('change', () => { nextBtn.disabled = false; });
+  nextBtn.addEventListener('click', handleNextQuestion);
+  
+  retryBtn.addEventListener('click', () => {
+    result.classList.add('hidden');
+    intro.classList.remove('hidden');
+  });
+
+  // ===== 유틸리티 함수 =====
   function toast(msg){
     const t=document.createElement('div');
     t.textContent=msg;
-    t.className='fixed bottom-4 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-lg opacity-0';
+    t.className='fixed bottom-4 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-lg';
     document.body.appendChild(t);
-    requestAnimationFrame(()=>{t.style.transition='opacity .2s'; t.style.opacity='1';});
-    setTimeout(()=>{t.style.opacity='0'; setTimeout(()=>t.remove(),200);},1200);
+    setTimeout(()=>t.remove(),1500);
   }
   function escapeHtml(s){return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');}
-  function unescapeHtml(s){return s.replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','\"').replaceAll('&amp;','&');}
+  function unescapeHtml(s){return s.replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&amp;','&');}
   </script>
 </body>
 </html>
